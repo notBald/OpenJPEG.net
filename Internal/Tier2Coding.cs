@@ -1190,6 +1190,8 @@ namespace OpenJpeg.Internal
 
                     if (t2_mode == T2_MODE.FINAL_PASS)
                         dest.Write(layer.data, layer.data_pos, (int)layer.len);
+                    else
+                        dest.Skip((int)layer.len);
                     cblk.numpasses += (uint)layer.numpasses;
                     length -= (int)layer.len;
 
