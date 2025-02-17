@@ -227,7 +227,7 @@ namespace OpenJpeg
         }
 
 
-        //2.5 - opj_j2k_setup_encoder
+        //2.5.1 - opj_j2k_setup_encoder
         internal bool SetupEncoder(CompressionParameters parameters, JPXImage image)
         {
             if (parameters == null || image == null)
@@ -282,6 +282,28 @@ namespace OpenJpeg
                 _cinfo.Error("Invalid value for cblockw_init: {0} not a power of 2 in range [4,1024]\n",
                               parameters.cblockh_init);
                 return false;
+            }
+
+            if (parameters.cp_fixed_alloc)
+            {
+                if (parameters.matrice == null)
+                {
+                    _cinfo.Error("cp_fixed_alloc set, but cp_matrice missing\n");
+                    return false;
+                }
+
+                if (parameters.tcp_numlayers > Constants.J2K_TCD_MATRIX_MAX_LAYER_COUNT)
+                {
+                    _cinfo.Error("tcp_numlayers when cp_fixed_alloc set should not exceed {0}\n",
+                                  Constants.J2K_TCD_MATRIX_MAX_LAYER_COUNT);
+                    return false;
+                }
+                if (parameters.numresolution > Constants.J2K_TCD_MATRIX_MAX_RESOLUTION_COUNT)
+                {
+                    _cinfo.Error("numresolution when cp_fixed_alloc set should not exceed {0}\n",
+                                  Constants.J2K_TCD_MATRIX_MAX_RESOLUTION_COUNT);
+                    return false;
+                }
             }
 
             //C# Implementation note. To avoid changes to the public API, we do this here
@@ -522,6 +544,8 @@ namespace OpenJpeg
             //copy user encoding parameters
             _cp.specific_param.enc.max_comp_size = (uint)parameters.max_comp_size;
             _cp.rsiz = parameters.rsiz;
+
+
             _cp.specific_param.enc.disto_alloc = parameters.cp_disto_alloc;
             _cp.specific_param.enc.fixed_alloc = parameters.cp_fixed_alloc;
             _cp.specific_param.enc.fixed_quality = parameters.cp_fixed_quality;

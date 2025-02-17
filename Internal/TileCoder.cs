@@ -419,14 +419,19 @@ namespace OpenJpeg.Internal
             }
         }
 
-        //2.5 - opj_tcd_rateallocate_fixed
+        //2.5.1 - opj_tcd_rateallocate_fixed
         void RateallocateFixed()
         {
             for (int layno = 0; layno < _tcp.numlayers; layno++)
                 MakeLayerFixed(layno, true);
         }
 
-        //2.5 - opj_tcd_rateallocate
+        /// <summary>
+        /// Rate allocation for the following methods:
+        ///  - allocation by rate/distortio (m_disto_alloc == 1)
+        ///  - allocation by fixed quality  (m_fixed_quality == 1)
+        /// </summary>
+        /// <remarks>2.5 - opj_tcd_rateallocate</remarks>
         bool Rateallocate(BufferCIO dest, ref uint data_written, int len)
         {
             double[] cumdisto = new double[100]; //Used for fixed quality
@@ -519,13 +524,22 @@ namespace OpenJpeg.Internal
                 {
                     var t2 = new Tier2Coding(_cinfo, _image, _cp);
                     double thresh = 0;
+                    bool last_layer_allocation_ok = false;
                     var hold = dest.BufferPos;
 
                     for (int i = 0; i < 128; i++)
                     {
-                        thresh = (lo + hi) / 2;
-                        
-                        MakeLayer(layno, thresh, false);
+                        double new_thresh = (lo + hi) / 2;
+
+                        // Stop iterating when the threshold has stabilized enough
+                        // 0.5 * 1e-5 is somewhat arbitrary, but has been selected
+                        // so that this doesn't change the results of the regression
+                        // test suite
+                        if (Math.Abs(new_thresh - thresh) <= 0.5 * 1e-5 * thresh)
+                            break;
+                        thresh = new_thresh;
+
+                        bool layer_allocation_is_same = MakeLayer(layno, thresh, false) && i != 0;
 
                         if (_cp.specific_param.enc.fixed_quality)
                         {
@@ -570,13 +584,30 @@ namespace OpenJpeg.Internal
                         }
                         else
                         {
-                            //Making sure dest starts from the original position
-                            if (!t2.EncodePackets(_tcd_tileno, tcd_tile, layno + 1, dest, out data_written, (uint)maxlen, null, _cur_tp_num, _tp_pos, _cur_pino, T2_MODE.THRESH_CALC))
+                            // Disto/rate based optimization
+                            //
+                            // Check if the layer allocation done by opj_tcd_makelayer()
+                            // is compatible of the maximum rate allocation. If not,
+                            // retry with a higher threshold.
+                            // If OK, try with a lower threshold.
+                            // Call opj_t2_encode_packets() only if opj_tcd_makelayer()
+                            // has resulted in different truncation points since its last
+                            // call.
+
+                            if ((layer_allocation_is_same && !last_layer_allocation_ok) ||
+                                (!last_layer_allocation_ok &&
+                                 !t2.EncodePackets(_tcd_tileno, tcd_tile, layno + 1, dest, 
+                                                   out data_written, (uint)maxlen, null, _cur_tp_num, _tp_pos, 
+                                                   _cur_pino, 
+                                                   T2_MODE.THRESH_CALC)))
                             {
+                                last_layer_allocation_ok = false;
                                 dest.BufferPos = hold;
                                 lo = thresh;
                                 continue;
                             }
+
+                            last_layer_allocation_ok = true;
                             dest.BufferPos = hold;
                             hi = thresh;
                             stable_thresh = thresh;
@@ -717,11 +748,18 @@ namespace OpenJpeg.Internal
             }
         }
 
-        //2.5 - opj_tcd_makelayer
-        void MakeLayer(uint layno, double thresh, bool final)
+        /// <param name="layno">Layer number</param>
+        /// <param name="thresh">Treshold</param>
+        /// <param name="final">If this is the final layer</param>
+        /// <returns>True if the layer allocation is unchanged</returns>
+        /// <remarks>2.5.1 - opj_tcd_makelayer</remarks>
+        bool MakeLayer(uint layno, double thresh, bool final)
         {
             var tcd_tile = _tcd_image.tiles[0];
+            bool layer_allocation_is_same = true;
+
             tcd_tile.distolayer[layno] = 0;
+
 
             for (uint compno = 0; compno < tcd_tile.numcomps; compno++)
             {
@@ -792,7 +830,11 @@ namespace OpenJpeg.Internal
                                     }
                                 }
 
-                                layer.numpasses = n - cblk.numpassesinlayers;
+                                if (layer.numpasses != n - cblk.numpassesinlayers)
+                                {
+                                    layer_allocation_is_same = false;
+                                    layer.numpasses = n - cblk.numpassesinlayers;
+                                }
 
                                 if (layer.numpasses == 0)
                                 {
@@ -823,6 +865,8 @@ namespace OpenJpeg.Internal
                     }
                 }
             }
+
+            return layer_allocation_is_same;
         }
 
         /// <summary>

@@ -11,8 +11,9 @@
         /// Number of maximum sub-band linked to number of resolution level
         /// </summary>
         internal const int J2K_MAXBANDS = (3 * J2K_MAXRLVLS - 2);
-
         internal const int J2K_DEFAULT_NB_SEGS = 10;
+        internal const int J2K_TCD_MATRIX_MAX_LAYER_COUNT = 10;
+        internal const int J2K_TCD_MATRIX_MAX_RESOLUTION_COUNT = 10;
 
         internal const int MQC_NUMCTXS = 19;
 
