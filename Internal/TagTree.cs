@@ -293,7 +293,7 @@ namespace OpenJpeg.Internal
         /// <param name="bio">Pointer to a BIO handle</param>
         /// <param name="leafno">Number that identifies the leaf to encode</param>
         /// <param name="threshold">Threshold to use when encoding value of the leaf</param>
-        /// <remarks>2.5 - opj_tgt_encode</remarks>
+        /// <remarks>2.5.1 - opj_tgt_encode</remarks>
         internal void Encode(WBIO bio, int leafno, uint threshold)
         {
             var stk = new TagNode[31];

@@ -240,7 +240,7 @@ namespace OpenJpeg.Internal
             }
         }
 
-        /// <remarks>2.5 - opj_t1_encode_cblk</remarks>
+        /// <remarks>2.5.1 - opj_t1_encode_cblk</remarks>
         internal double EncodeCblk(
             TcdCblkEnc cblk, 
             uint orient, 
@@ -271,6 +271,15 @@ namespace OpenJpeg.Internal
                     int tmp = _data[datap];
                     if (tmp < 0)
                     {
+                        if (tmp == int.MinValue)
+                        {
+                            //2.5.1 - avoid undefined behaviour on fuzzed input
+                            //
+                            //If we go here, it means we have supplied an input
+                            //with more bit depth than we we can really support.
+                            tmp = int.MinValue + 1;
+                        }
+
                         max = Math.Max(max, -tmp);
                         uint tmp_unsigned = to_smr(tmp);
                         _data[datap] = (int)tmp_unsigned;
@@ -5916,9 +5925,9 @@ namespace OpenJpeg.Internal
         /// <param name="w">Width, max 1024</param>
         /// <param name="h">Height, max 1024</param>    
         /// <remarks>
-        /// 2.5 - opj_t1_allocate_buffers (in ht_dec.c)
+        /// 2.5.1 - opj_t1_allocate_buffers (in ht_dec.c)
         /// 
-        /// This function must be moved to the ht_dec file
+        /// This function should be moved to the ht_dec.cs file to align with the original impl.
         /// </remarks>
         void ht_dec_allocate_buffers(int w, int h)
         {
@@ -5948,12 +5957,12 @@ namespace OpenJpeg.Internal
             if (new_flagsize > flagssize || flags == null)
             {
                 flags = new T1[new_flagsize];
-                flagssize = new_flagsize;
             }
             else
             {
-                Array.Clear(flags, 0, flags.Length);
+                Array.Clear(flags, 0, new_flagsize);
             }
+            flagssize = new_flagsize;
 
             _w = (uint)w;
             _h = (uint)h;

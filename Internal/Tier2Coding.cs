@@ -918,7 +918,7 @@ namespace OpenJpeg.Internal
         /// <param name="data_written"></param>
         /// <param name="length">Length of the destination buffer</param>
         /// <param name="t2_mode">If == THRESH_CALC In Threshold calculation ,If == FINAL_PASS Final pass</param>
-        /// <remarks>2.5 - opj_t2_encode_packet</remarks>
+        /// <remarks>2.5.1 - opj_t2_encode_packet</remarks>
         internal bool EncodePacket(uint tileno, 
                                    TcdTile tile, 
                                    TileCodingParams tcp, 
@@ -1033,9 +1033,9 @@ namespace OpenJpeg.Internal
             //Sets up a bit writer.
             //C# this method is the only method that uses this bitwriter. It was
             //   created for the 1.4 conversion, and is probably doing more work
-            //   than it needs to (like creating its own buffer).
+            //   than it needs to.
             var bio = new WBIO(dest, length);
-            bio.Write(1, packet_empty ? 0 : 1); // Empty header bit
+            bio.WriteBit(packet_empty ? 0 : 1); // Empty header bit
 
             // Writes the packet header
             for (int bandno = 0; !packet_empty && bandno < res.numbands; bandno++)
@@ -1188,7 +1188,8 @@ namespace OpenJpeg.Internal
                         return false;
                     }
 
-                    dest.Write(layer.data, layer.data_pos, (int)layer.len);
+                    if (t2_mode == T2_MODE.FINAL_PASS)
+                        dest.Write(layer.data, layer.data_pos, (int)layer.len);
                     cblk.numpasses += (uint)layer.numpasses;
                     length -= (int)layer.len;
 
@@ -1230,7 +1231,7 @@ namespace OpenJpeg.Internal
             return (37 + (uint)bio.Read(7));
         }
 
-        //2.5 - opj_t2_putcommacode
+        //2.5.1 - opj_t2_putcommacode
         static void PutCommaCode(WBIO bio, int n)
         {
             while (--n >= 0)
@@ -1243,7 +1244,7 @@ namespace OpenJpeg.Internal
         /// </summary>
         /// <param name="bio">Bit Input/Output component</param>
         /// <param name="n">delta Zil</param>
-        /// <remarks>2.5 - opj_t2_putnumpasses</remarks>
+        /// <remarks>2.5.1 - opj_t2_putnumpasses</remarks>
         static void PutNumPasses(WBIO bio, uint n)
         {
             if (n == 1)
@@ -1258,7 +1259,7 @@ namespace OpenJpeg.Internal
                 bio.Write(0xff80 | (n - 37), 16);
         }
 
-        //2.5
+        //2.5.1 - opj_t2_init_seg
         static void InitSegment(TcdCblkDec dec, uint index, CCP_CBLKSTY cblksty, bool first)
         {
             if (dec.segs == null)
