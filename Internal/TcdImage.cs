@@ -80,9 +80,9 @@ namespace OpenJpeg.Internal
         internal TcdTilecomp[] comps;
 
         /// <summary>
-        /// Add fixed_quality
+        /// Number of pixels of the tile
         /// </summary>
-        internal int numpix;
+        internal uint numpix;
 
         /// <summary>
         /// Add fixed_quality
@@ -198,9 +198,9 @@ namespace OpenJpeg.Internal
 #endif
 
         /// <summary>
-        /// Add fixed_quality
+        /// Number of pixels
         /// </summary>
-        internal int numpix;
+        internal uint numpix;
 
         /// <summary>
         /// Allocates tile component data

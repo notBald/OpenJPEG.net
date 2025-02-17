@@ -545,13 +545,20 @@ namespace OpenJpeg
             _cp.specific_param.enc.max_comp_size = (uint)parameters.max_comp_size;
             _cp.rsiz = parameters.rsiz;
 
+            if (parameters.cp_fixed_alloc)
+            {
+                CP.specific_param.enc.quality_layer_alloc_strategy = J2K_QUALITY_LAYER_ALLOCATION_STRATEGY.FIXED_LAYER;
+            }
+            else if (parameters.FixedQuality)
+            {
+                CP.specific_param.enc.quality_layer_alloc_strategy = J2K_QUALITY_LAYER_ALLOCATION_STRATEGY.FIXED_DISTORTION_RATIO;
+            }
+            else
+            {
+                CP.specific_param.enc.quality_layer_alloc_strategy = J2K_QUALITY_LAYER_ALLOCATION_STRATEGY.RATE_DISTORTION_RATIO;
+            }
 
-            _cp.specific_param.enc.disto_alloc = parameters.cp_disto_alloc;
-            _cp.specific_param.enc.fixed_alloc = parameters.cp_fixed_alloc;
-            _cp.specific_param.enc.fixed_quality = parameters.cp_fixed_quality;
-            
-            // mod fixed quality
-            if (parameters.cp_fixed_alloc && parameters.matrice != null)
+            if (parameters.cp_fixed_alloc)
             {
                 //Int64 in org. Impl, but C# don't support arrays > 2GB
                 int array_size = parameters.tcp_numlayers * parameters.numresolution * 3;
@@ -627,23 +634,24 @@ namespace OpenJpeg
             {
                 TileCodingParams tcp = new TileCodingParams();
                 _cp.tcps[tileno] = tcp;
+                bool fixed_distoratio = CP.specific_param.enc.quality_layer_alloc_strategy == J2K_QUALITY_LAYER_ALLOCATION_STRATEGY.FIXED_DISTORTION_RATIO;
                 tcp.numlayers = (uint) parameters.tcp_numlayers;
 
-                //Using Array.Copy instead of for loop
+                //C# impl note: Using Array.Copy instead of for loop
                 if (parameters.IsCinema || parameters.IsIMF)
                 {
-                    if (_cp.specific_param.enc.fixed_quality)
+                    if (fixed_distoratio)
                         Array.Copy(parameters.tcp_distoratio, tcp.distoratio, tcp.numlayers);
                     Array.Copy(parameters.tcp_rates, tcp.rates, tcp.numlayers);
                 }
                 else
                 {
-                    if (_cp.specific_param.enc.fixed_quality)
+                    if (fixed_distoratio)
                         Array.Copy(parameters.tcp_distoratio, tcp.distoratio, tcp.numlayers);
                     else
                         Array.Copy(parameters.tcp_rates, tcp.rates, tcp.numlayers);
                 }
-                if (!_cp.specific_param.enc.fixed_quality)
+                if (!fixed_distoratio)
                 {
                     for(int j=0; j<tcp.numlayers; j++)
                     {
@@ -7369,6 +7377,7 @@ namespace OpenJpeg
             public EncParams encoder;
         }
 
+        //opj_encoding_param 
         struct EncParams
         {
             /// <summary>

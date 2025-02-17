@@ -53,6 +53,27 @@ namespace OpenJpeg
     }
 
     /// <summary>
+    /// Rate allocation strategy
+    /// </summary>
+    public enum J2K_QUALITY_LAYER_ALLOCATION_STRATEGY
+    {
+        /// <summary>
+        /// Allocation by rate/distortion
+        /// </summary>
+        RATE_DISTORTION_RATIO,
+
+        /// <summary>
+        /// Allocation by fixed distortion ratio (PSNR) (fixed quality)
+        /// </summary>
+        FIXED_DISTORTION_RATIO,
+
+        /// <summary>
+        /// Allocation by fixed layer (number of passes per layer / resolution / subband)
+        /// </summary>
+        FIXED_LAYER
+    }
+
+    /// <summary>
     /// JPEG 2000 Profiles
     /// </summary>
     [Flags()]

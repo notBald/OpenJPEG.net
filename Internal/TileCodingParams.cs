@@ -8,6 +8,7 @@ namespace OpenJpeg.Internal
     /// This class is used to store coding/decoding
     /// parameters common to all tiles.
     /// </summary>
+    /// <remarks>opj_tcp_t</remarks>
     internal class TileCodingParams : ICloneable
     {
         #region Variables and properties

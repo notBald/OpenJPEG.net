@@ -13,6 +13,7 @@ namespace OpenJpeg
     /// Class that holds the parameters needed for encoding to a JP2000
     /// format.
     /// </summary>
+    /// <remarks>opj_cparameters</remarks>
     public class CompressionParameters
     {
         #region Variables and properties
@@ -1016,9 +1017,7 @@ namespace OpenJpeg
         public int[] matrice;
         public byte tp_flag;
 
-        public bool disto_alloc;
-        public bool fixed_alloc;
-        public bool fixed_quality;
+        public J2K_QUALITY_LAYER_ALLOCATION_STRATEGY quality_layer_alloc_strategy;
         public bool tp_on;
     }
 

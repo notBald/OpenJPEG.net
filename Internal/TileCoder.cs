@@ -407,7 +407,8 @@ namespace OpenJpeg.Internal
         //2.5 - opj_tcd_rate_allocate_encode
         void RateAllocateEncode(BufferCIO dest, int max_dest_size)
         {
-            if (_cp.specific_param.enc.disto_alloc || _cp.specific_param.enc.fixed_quality)
+            if (_cp.specific_param.enc.quality_layer_alloc_strategy == J2K_QUALITY_LAYER_ALLOCATION_STRATEGY.RATE_DISTORTION_RATIO || 
+                _cp.specific_param.enc.quality_layer_alloc_strategy == J2K_QUALITY_LAYER_ALLOCATION_STRATEGY.FIXED_DISTORTION_RATIO)
             {
                 uint dw = 0;
                 Rateallocate(dest, ref dw, max_dest_size);
@@ -428,14 +429,14 @@ namespace OpenJpeg.Internal
 
         /// <summary>
         /// Rate allocation for the following methods:
-        ///  - allocation by rate/distortio (m_disto_alloc == 1)
-        ///  - allocation by fixed quality  (m_fixed_quality == 1)
+        ///  - allocation by rate/distortio (quality_layer_alloc_strategy == RATE_DISTORTION_RATIO)
+        ///  - allocation by fixed quality  (quality_layer_alloc_strategy == FIXED_DISTORTION_RATIO)
         /// </summary>
         /// <remarks>2.5 - opj_tcd_rateallocate</remarks>
         bool Rateallocate(BufferCIO dest, ref uint data_written, int len)
         {
-            double[] cumdisto = new double[100]; //Used for fixed quality
-            const double K = 1; //Also used for fixed quality
+            double[] cumdisto = new double[100];
+            const double K = 1;
             double maxSE = 0;
 
             double min = double.MaxValue;
@@ -491,8 +492,12 @@ namespace OpenJpeg.Internal
                                         max = rdslope;
                                 }
 
-                                tcd_tile.numpix += ((cblk.x1 - cblk.x0) * (cblk.y1 - cblk.y0));
-                                tilec.numpix += ((cblk.x1 - cblk.x0) * (cblk.y1 - cblk.y0));
+                                {
+                                    uint cblk_pix_count = (uint)((cblk.x1 - cblk.x0) *
+                                                                 (cblk.y1 - cblk.y0));
+                                    tcd_tile.numpix += cblk_pix_count;
+                                    tilec.numpix += cblk_pix_count;
+                                }
                             }
                         }
                     }
@@ -502,7 +507,7 @@ namespace OpenJpeg.Internal
                     * ((double)(tilec.numpix));
             }
 
-            //C# snip cstr_info, the pointer is always NULL unless you change the source code
+            //C# snip cstr_info
 
             for (uint layno = 0; layno < _tcp.numlayers; layno++)
             {
@@ -514,12 +519,12 @@ namespace OpenJpeg.Internal
                 double distotarget = tcd_tile.distotile - ((K * maxSE) / Math.Pow((float)10, _tcp.distoratio[layno] / 10));
 
                 /* Don't try to find an optimal threshold but rather take everything not included yet, if
-                  -r xx,yy,zz,0   (disto_alloc == 1 and rates == 0)
-                  -q xx,yy,zz,0	  (fixed_quality == 1 and distoratio == 0)
+                  -r xx,yy,zz,0   (quality_layer_alloc_strategy == RATE_DISTORTION_RATIO and rates == NULL)
+                  -q xx,yy,zz,0	  (quality_layer_alloc_strategy == FIXED_DISTORTION_RATIO and distoratio == NULL)
                   ==> possible to have some lossy layers and the last layer for sure lossless */
-                if ((_cp.specific_param.enc.disto_alloc && 
+                if ((_cp.specific_param.enc.quality_layer_alloc_strategy == J2K_QUALITY_LAYER_ALLOCATION_STRATEGY.RATE_DISTORTION_RATIO && 
                      _tcp.rates[layno] > 0) || 
-                     _cp.specific_param.enc.fixed_quality && 
+                     _cp.specific_param.enc.quality_layer_alloc_strategy == J2K_QUALITY_LAYER_ALLOCATION_STRATEGY.FIXED_DISTORTION_RATIO && 
                      _tcp.distoratio[layno] > 0)
                 {
                     var t2 = new Tier2Coding(_cinfo, _image, _cp);
@@ -541,7 +546,7 @@ namespace OpenJpeg.Internal
 
                         bool layer_allocation_is_same = MakeLayer(layno, thresh, false) && i != 0;
 
-                        if (_cp.specific_param.enc.fixed_quality)
+                        if (_cp.specific_param.enc.quality_layer_alloc_strategy == J2K_QUALITY_LAYER_ALLOCATION_STRATEGY.FIXED_DISTORTION_RATIO)
                         {
                             double distoachieved;
                             if (_cp.IsCinema || _cp.IsIMF)
@@ -635,7 +640,7 @@ namespace OpenJpeg.Internal
         }
 
         /// <remarks>
-        /// 2.5 - opj_tcd_makelayer_fixed
+        /// 2.5.1 - opj_tcd_makelayer_fixed
         /// 
         /// This code seems to be working, but has not been tested against the original impl.
         /// </remarks>
@@ -644,7 +649,7 @@ namespace OpenJpeg.Internal
             Debug.Assert(false, "Untested code");
             var tcd_tile = _tcd_image.tiles[0];
             tcd_tile.distolayer[layno] = 0;
-            var matrice = new int[10, 10, 3];
+            var matrice = new int[Constants.J2K_TCD_MATRIX_MAX_LAYER_COUNT, Constants.J2K_TCD_MATRIX_MAX_RESOLUTION_COUNT, 3];
             int value;
 
             for (int compno = 0; compno < tcd_tile.numcomps; compno++)
