@@ -1620,7 +1620,7 @@ namespace OpenJpeg.Internal
         }
 
         /// <remarks>
-        /// 2.5 - opj_t1_ht_decode_cblk
+        /// 2.5.1 - opj_t1_ht_decode_cblk
         /// 
         /// This function sits in the ht_dec source file, however to do that
         /// various functions have to be set internal. Instead this main function
@@ -1838,7 +1838,14 @@ namespace OpenJpeg.Internal
             // init structures
             ht_dec.frwd_struct sigprop = null; //C# if converting to a struct, simply drop this null
             ht_dec.rev_struct magref = null; //C# if converting to a struct, simply drop this null
-            var mel = new ht_dec.dec_mel(cblkdata, coded_data, lcup, scup);
+            bool fail;
+            var mel = new ht_dec.dec_mel(cblkdata, coded_data, lcup, scup, out fail);
+            if (fail) 
+            {
+                cinfo.ErrorMT("Malformed HT codeblock. " +
+                              "Incorrect MEL segment sequence.\n");
+                return false;
+            }
             var vlc = new ht_dec.rev_struct(cblkdata, coded_data, lcup, scup);
             var magsgn = new ht_dec.frwd_struct(cblkdata, coded_data, lcup - scup, 0xFF);
             if (num_passes > 1) {

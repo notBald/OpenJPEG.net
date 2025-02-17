@@ -351,7 +351,8 @@ namespace OpenJpeg.Internal
             /// <param name="offset">Pointer to start of data</param>
             /// <param name="lcup">Length of MagSgn+MEL+VLC segments</param>
             /// <param name="scup">Length of MEL+VLC segments</param>
-            internal dec_mel(byte[] buffer, int offset, int lcup, int scup)
+            /// <remarks>mel_init</remarks>
+            internal dec_mel(byte[] buffer, int offset, int lcup, int scup, out bool fail)
             {
                 src = buffer;
                 data = offset + lcup - scup; // move the pointer to the start of MEL
@@ -372,7 +373,12 @@ namespace OpenJpeg.Internal
                     ulong d;
                     int d_bits;
 
-                    Debug.Assert(unstuff == false || src[data] <= 0x8F);
+                    //Debug.Assert(unstuff == false || src[data] <= 0x8F);
+                    if (unstuff && src[data] > 0x8F)
+                    {
+                        fail = true;
+                        return;
+                    }
                     d = (size > 0) ? src[data] : 0xFFu; // if buffer is consumed
                                                         // set data to 0xFF
                     if (size == 1)
@@ -389,6 +395,8 @@ namespace OpenJpeg.Internal
                 }
                 tmp <<= (64 - bits); //push all the way up so the first bit
                 // is the MSB
+
+                fail = false;
             }
 
             /// <summary>
