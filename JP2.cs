@@ -850,9 +850,10 @@ namespace OpenJpeg
 	        for(i = 0; i < nr_channels; ++i)
             {
                 /* Palette mapping: */
-	            cmp = cmap[i].cmp; pcol = cmap[i].pcol;
+	            cmp = cmap[i].cmp; 
+                pcol = cmap[i].pcol;
 	            src = old_comps[cmp].data; 
-	            max = (uint) new_comps[pcol].w * (uint) new_comps[pcol].h;
+	            max = (uint) new_comps[i].w * (uint) new_comps[i].h;
 
                 /* Direct use: */
                 if (cmap[i].mtyp == 0)

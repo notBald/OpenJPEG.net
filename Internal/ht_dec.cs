@@ -351,7 +351,7 @@ namespace OpenJpeg.Internal
             /// <param name="offset">Pointer to start of data</param>
             /// <param name="lcup">Length of MagSgn+MEL+VLC segments</param>
             /// <param name="scup">Length of MEL+VLC segments</param>
-            /// <remarks>mel_init</remarks>
+            /// <remarks>2.5.1 - mel_init</remarks>
             internal dec_mel(byte[] buffer, int offset, int lcup, int scup, out bool fail)
             {
                 src = buffer;
