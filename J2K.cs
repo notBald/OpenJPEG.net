@@ -595,8 +595,8 @@ namespace OpenJpeg
                     return false;
                 }
 
-                _cp.tw = (uint)MyMath.int_ceildiv((int) (image.x1 - _cp.tx0), (int)_cp.tdx);
-                _cp.th = (uint)MyMath.int_ceildiv((int)( image.y1 - _cp.ty0), (int)_cp.tdy);
+                _cp.tw = MyMath.uint_ceildiv(image.x1 - _cp.tx0, _cp.tdx);
+                _cp.th = MyMath.uint_ceildiv( image.y1 - _cp.ty0, _cp.tdy);
 
                 if (_cp.tw > 65535 / CP.th)
                 {
@@ -3488,7 +3488,7 @@ namespace OpenJpeg
         /// <param name="image">Dest image</param>
         /// <param name="tile_index">Tile to decode</param>
         /// <returns>False on error</returns>
-        /// <remarks>2.5</remarks>
+        /// <remarks>2.5.1 - opj_j2k_get_tile</remarks>
         internal bool Decode(JPXImage image, uint tile_index)
         {
             if (image == null)
@@ -3543,10 +3543,8 @@ namespace OpenJpeg
 
                 img_comp.factor = _private_image.comps[compno].factor;
 
-                img_comp.x0 = (uint)MyMath.int_ceildiv((int)image.x0,
-                                 (int)img_comp.dx);
-                img_comp.y0 = (uint)MyMath.int_ceildiv((int)image.y0,
-                                 (int)img_comp.dy);
+                img_comp.x0 = MyMath.uint_ceildiv(image.x0, img_comp.dx);
+                img_comp.y0 = MyMath.uint_ceildiv(image.y0, img_comp.dy);
                 comp_x1 = MyMath.int_ceildiv((int)image.x1, (int)img_comp.dx);
                 comp_y1 = MyMath.int_ceildiv((int)image.y1, (int)img_comp.dy);
 
@@ -5501,7 +5499,7 @@ namespace OpenJpeg
         /// </summary>
         /// <param name="header_size">The size of the data contained in the SIZ marker</param>
         /// <remarks>
-        /// 2.5 - opj_j2k_read_siz
+        /// 2.5.1 - opj_j2k_read_siz
         /// </remarks>
         internal bool ReadSIZ(int header_size)
         {
@@ -5650,8 +5648,8 @@ namespace OpenJpeg
             }
 
             //Computes the number of tiles
-            _cp.tw = (uint) MyMath.int_ceildiv((int)(_private_image.x1 - _cp.tx0), (int)_cp.tdx);
-            _cp.th = (uint) MyMath.int_ceildiv((int)(_private_image.y1 - _cp.ty0), (int)_cp.tdy);
+            _cp.tw = (uint) MyMath.uint_ceildiv(_private_image.x1 - _cp.tx0, _cp.tdx);
+            _cp.th = (uint) MyMath.uint_ceildiv(_private_image.y1 - _cp.ty0, _cp.tdy);
 
             //Check that the number of tiles is valid
             if (_cp.tw == 0 || _cp.th == 0 || _cp.tw > 65535 / _cp.th)
@@ -5666,8 +5664,8 @@ namespace OpenJpeg
             {
                 _specific_param.decoder.start_tile_x = ((_specific_param.decoder.start_tile_x - _cp.tx0) / _cp.tdx);
                 _specific_param.decoder.start_tile_y = ((_specific_param.decoder.start_tile_y - _cp.ty0) / _cp.tdy);
-                _specific_param.decoder.end_tile_x = (OPJ_UINT32)MyMath.int_ceildiv((int)(_specific_param.decoder.end_tile_x - _cp.tx0), (int) _cp.tdx);
-                _specific_param.decoder.end_tile_y = (OPJ_UINT32)MyMath.int_ceildiv((int)(_specific_param.decoder.end_tile_y - _cp.ty0), (int) _cp.tdy);
+                _specific_param.decoder.end_tile_x = MyMath.uint_ceildiv(_specific_param.decoder.end_tile_x - _cp.tx0, _cp.tdx);
+                _specific_param.decoder.end_tile_y = MyMath.uint_ceildiv(_specific_param.decoder.end_tile_y - _cp.ty0, _cp.tdy);
             }
             else
             {
@@ -6896,7 +6894,7 @@ namespace OpenJpeg
 
         #region Helper functions
 
-        //2.5 - opj_j2k_update_image_dimensions
+        //2.5.1 - opj_j2k_update_image_dimensions
         private bool UpdateImageDimensions(JPXImage image)
         {
             uint it_comp;
@@ -6917,10 +6915,8 @@ namespace OpenJpeg
                 }
                 var img_comp = img_comp_ar[it_comp];
 
-                img_comp.x0 = (OPJ_UINT32)MyMath.int_ceildiv((int)image.x0,
-                                 (int)img_comp.dx);
-                img_comp.y0 = (OPJ_UINT32)MyMath.int_ceildiv((int)image.y0,
-                                 (int)img_comp.dy);
+                img_comp.x0 = MyMath.uint_ceildiv(image.x0, img_comp.dx);
+                img_comp.y0 = MyMath.uint_ceildiv(image.y0, img_comp.dy);
                 comp_x1 = MyMath.int_ceildiv((int)image.x1, (int)img_comp.dx);
                 comp_y1 = MyMath.int_ceildiv((int)image.y1, (int)img_comp.dy);
 
@@ -7067,7 +7063,7 @@ namespace OpenJpeg
             }
             else
             {
-                _specific_param.decoder.end_tile_x = (OPJ_UINT32)MyMath.int_ceildiv((end_x - (int)_cp.tx0) , (int) _cp.tdx);
+                _specific_param.decoder.end_tile_x = MyMath.uint_ceildiv(((uint)end_x - _cp.tx0) , _cp.tdx);
                 image.x1 = (uint)end_x;
             }
 
@@ -7095,7 +7091,7 @@ namespace OpenJpeg
             }
             else
             {
-                _specific_param.decoder.end_tile_y = (OPJ_UINT32)MyMath.int_ceildiv((end_y - (int)_cp.ty0), (int)_cp.tdy);
+                _specific_param.decoder.end_tile_y = MyMath.uint_ceildiv((uint)end_y - _cp.ty0, _cp.tdy);
                 image.y1 = (uint)end_y;
             }
 
