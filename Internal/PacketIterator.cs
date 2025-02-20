@@ -302,7 +302,7 @@ namespace OpenJpeg.Internal
             return cp.tcps[tile_no].numlayers * max_prec * image.numcomps * max_res;
         }
 
-        //2.5 - opj_get_encoding_parameters
+        //2.5.1 - opj_get_encoding_parameters
         static void GetEncodingParameters(JPXImage image,
                                           CodingParameters cp,
                                           uint tileno,
@@ -371,18 +371,20 @@ namespace OpenJpeg.Internal
 		        /* use custom size for precincts */
                 for (resno = 0; resno < tccp.numresolutions; ++resno)
                 {
-			        uint l_dx, l_dy;
+			        ulong l_dx, l_dy;
 
 			        /* precinct width and height */
 			        l_pdx = tccp.prcw[resno];
                     l_pdy = tccp.prch[resno];
 
-			        l_dx = img_comp.dx * (1u << (int) (l_pdx + tccp.numresolutions - 1 - resno));
-			        l_dy = img_comp.dy * (1u << (int) (l_pdy + tccp.numresolutions - 1 - resno));
+			        l_dx = img_comp.dx * (1ul << (int) (l_pdx + tccp.numresolutions - 1 - resno));
+			        l_dy = img_comp.dy * (1ul << (int) (l_pdy + tccp.numresolutions - 1 - resno));
 
 			        /* take the minimum size for dx for each comp and resolution */
-			        p_dx_min = Math.Min(p_dx_min, l_dx);
-			        p_dy_min = Math.Min(p_dy_min, l_dy);
+                    if (l_dx <= uint.MaxValue)
+			            p_dx_min = Math.Min(p_dx_min, (uint) l_dx);
+                    if (l_dy <= uint.MaxValue)
+			            p_dy_min = Math.Min(p_dy_min, (uint) l_dy);
 
 			        /* various calculations of extents */
 			        l_level_no = (uint) (tccp.numresolutions - 1 - resno);
@@ -1705,7 +1707,7 @@ namespace OpenJpeg.Internal
         /// Next Resolution, ProgOrder(y then x), Component, Layer
         /// </summary>
         /// <remarks>
-        /// 2.5
+        /// 2.5.1
         /// </remarks>
         IEnumerable<bool> Next_rpcl()
         {
@@ -1779,44 +1781,37 @@ namespace OpenJpeg.Internal
                                 continue;
                             res = comp.resolutions[resno];
                             levelno = comp.numresolutions - 1u - resno;
-                            // Avoids division by zero
-                            // https://github.com/uclouvain/openjpeg/issues/938
-                            if (levelno >= 32 ||
-                                ((comp.dx << (int) levelno) >> (int) levelno) != comp.dx ||
-                                ((comp.dy << (int) levelno) >> (int) levelno) != comp.dy)
+
+                            if ((uint)(((ulong)comp.dx << (int) levelno) >> (int) levelno) != comp.dx ||
+                            (uint)(((ulong)comp.dy << (int) levelno) >> (int) levelno) != comp.dy)
                             {
                                 continue;
                             }
-                            if ((comp.dx << (int)levelno) > int.MaxValue ||
-                                (comp.dy << (int)levelno) > int.MaxValue)
-                            {
-                                continue;
-                            }
-                            trx0 = MyMath.uint_ceildiv(tx0, comp.dx << (int)levelno);
-                            try0 = MyMath.uint_ceildiv(ty0, comp.dy << (int)levelno);
-                            trx1 = MyMath.uint_ceildiv(tx1, comp.dx << (int)levelno);
-                            try1 = MyMath.uint_ceildiv(ty1, comp.dy << (int)levelno);
+
+                            trx0 = MyMath.uint64_ceildiv_res_uint32(tx0, (ulong)comp.dx << (int)levelno);
+                            try0 = MyMath.uint64_ceildiv_res_uint32(ty0, (ulong)comp.dy << (int)levelno);
+                            trx1 = MyMath.uint64_ceildiv_res_uint32(tx1, (ulong)comp.dx << (int)levelno);
+                            try1 = MyMath.uint64_ceildiv_res_uint32(ty1, (ulong)comp.dy << (int)levelno);
                             rpx = res.pdx + levelno;
                             rpy = res.pdy + levelno;
 
-                            // Avoid divisions by zero / undefined behaviour on shift
-                            // https://github.com/uclouvain/openjpeg/issues/938
-                            if (rpx >= 31 || ((comp.dx << (int)rpx) >> (int)rpx) != comp.dx ||
-                                rpy >= 31 || ((comp.dy << (int)rpy) >> (int)rpy) != comp.dy)
+                            if ((uint)(((ulong)comp.dx << (int) rpx) >> (int) rpx) != comp.dx ||
+                            (uint)(((ulong)comp.dy << (int) rpy) >> (int) rpy) != comp.dy)
                             {
                                 continue;
                             }
 
-                            if (!((y % (comp.dy << (int)rpy) == 0) || ((y == ty0) && ((try0 << (int)levelno) % (1u << (int)rpy)) != 0)))
+                            /* See ISO-15441. B.12.1.3 Resolution level-position-component-layer progression */
+                            if (!(((ulong)y % ((ulong)comp.dy << (int) rpy) == 0) || ((y == ty0) && (((ulong)try0 << (int) levelno) % ((ulong)1U << (int) rpy)) != 0)))
                                 continue;
-                            if (!((x % (comp.dx << (int)rpx) == 0) || ((x == tx0) && ((trx0 << (int)levelno) % (1u << (int)rpx)) != 0)))
+                            if (!(((ulong)x % ((ulong)comp.dx << (int) rpx) == 0) || ((x == tx0) && (((ulong)trx0 << (int)levelno) % ((ulong)1U << (int)rpx)) != 0)))
                                 continue;
                             if ((res.pw == 0) || (res.ph == 0)) continue;
                             if ((trx0 == trx1) || (try0 == try1)) continue;
 
-                            prci = MyMath.uint_floordivpow2(MyMath.uint_ceildiv(x, comp.dx << (int)levelno), (int)res.pdx)
+                            prci = MyMath.uint_floordivpow2(MyMath.uint64_ceildiv_res_uint32(x, (ulong)comp.dx << (int)levelno), (int)res.pdx)
                                     - MyMath.uint_floordivpow2(trx0, (int)res.pdx);
-                            prcj = MyMath.uint_floordivpow2(MyMath.uint_ceildiv(y, comp.dy << (int)levelno), (int)res.pdy)
+                            prcj = MyMath.uint_floordivpow2(MyMath.uint64_ceildiv_res_uint32(y, (ulong)comp.dy << (int)levelno), (int)res.pdy)
                                     - MyMath.uint_floordivpow2(try0, (int)res.pdy);
                             precno = prci + prcj * res.pw;
                             
@@ -1844,7 +1839,7 @@ namespace OpenJpeg.Internal
         /// <summary>
         /// Next ProgOrder(y then x), Component, Resolution, Layer
         /// </summary>
-        /// <remarks>2.5 - opj_pi_next_pcrl</remarks>
+        /// <remarks>2.5.1 - opj_pi_next_pcrl</remarks>
         IEnumerable<bool> Next_pcrl()
         {
             PIComp comp;
@@ -1914,43 +1909,37 @@ namespace OpenJpeg.Internal
 
                             res = comp.resolutions[resno];
                             levelno = comp.numresolutions - 1 - resno;
-                            // Avoids division by zero
-                            // https://github.com/uclouvain/openjpeg/issues/938
-                            if (levelno >= 32 ||
-                                ((comp.dx << (int)levelno) >> (int)levelno) != comp.dx ||
-                                ((comp.dy << (int)levelno) >> (int)levelno) != comp.dy)
+
+                            if ((uint)(((ulong)comp.dx << (int)levelno) >> (int)levelno) != comp.dx ||
+                            (uint)(((ulong)comp.dy << (int)levelno) >> (int)levelno) != comp.dy)
                             {
                                 continue;
                             }
-                            if ((comp.dx << (int)levelno) > int.MaxValue ||
-                                (comp.dy << (int)levelno) > int.MaxValue)
-                            {
-                                continue;
-                            }
-                            trx0 = MyMath.uint_ceildiv(tx0, comp.dx << (int)levelno);
-                            try0 = MyMath.uint_ceildiv(ty0, comp.dy << (int)levelno);
-                            trx1 = MyMath.uint_ceildiv(tx1, comp.dx << (int)levelno);
-                            try1 = MyMath.uint_ceildiv(ty1, comp.dy << (int)levelno);
+
+                            trx0 = MyMath.uint64_ceildiv_res_uint32(tx0, (ulong)comp.dx << (int)levelno);
+                            try0 = MyMath.uint64_ceildiv_res_uint32(ty0, (ulong)comp.dy << (int)levelno);
+                            trx1 = MyMath.uint64_ceildiv_res_uint32(tx1, (ulong)comp.dx << (int)levelno);
+                            try1 = MyMath.uint64_ceildiv_res_uint32(ty1, (ulong)comp.dy << (int)levelno);
                             rpx = res.pdx + levelno;
                             rpy = res.pdy + levelno;
 
-                            // Avoid divisions by zero / undefined behaviour on shift
-                            // https://github.com/uclouvain/openjpeg/issues/938
-                            if (rpx >= 31 || ((comp.dx << (int)rpx) >> (int)rpx) != comp.dx ||
-                                rpy >= 31 || ((comp.dy << (int)rpy) >> (int)rpy) != comp.dy)
+                            if ((uint)(((ulong)comp.dx << (int)rpx) >> (int)rpx) != comp.dx ||
+                            (uint)(((ulong)comp.dy << (int)rpy) >> (int)rpy) != comp.dy)
                             {
                                 continue;
                             }
-                            if (!((y % (comp.dy << (int)rpy) == 0) || ((y == ty0) && ((try0 << (int)levelno) % (1u << (int)rpy)) != 0)))
+
+                            /* See ISO-15441. B.12.1.3 Resolution level-position-component-layer progression */
+                            if (!(((ulong)y % ((ulong)comp.dy << (int)rpy) == 0) || ((y == ty0) && (((ulong)try0 << (int)levelno) % ((ulong)1U << (int)rpy)) != 0)))
                                 continue;
-                            if (!((x % (comp.dx << (int)rpx) == 0) || ((x == tx0) && ((trx0 << (int)levelno) % (1u << (int)rpx)) != 0)))
+                            if (!(((ulong)x % ((ulong)comp.dx << (int)rpx) == 0) || ((x == tx0) && (((ulong)trx0 << (int)levelno) % ((ulong)1U << (int)rpx)) != 0)))
                                 continue;
                             if ((res.pw == 0) || (res.ph == 0)) continue;
                             if ((trx0 == trx1) || (try0 == try1)) continue;
 
-                            prci = MyMath.uint_floordivpow2(MyMath.uint_ceildiv(x, comp.dx << (int)levelno), (int)res.pdx)
+                            prci = MyMath.uint_floordivpow2(MyMath.uint64_ceildiv_res_uint32(x, (ulong)comp.dx << (int)levelno), (int)res.pdx)
                                     - MyMath.uint_floordivpow2(trx0, (int)res.pdx);
-                            prcj = MyMath.uint_floordivpow2(MyMath.uint_ceildiv(y, comp.dy << (int)levelno), (int)res.pdy)
+                            prcj = MyMath.uint_floordivpow2(MyMath.uint64_ceildiv_res_uint32(y, (ulong)comp.dy << (int)levelno), (int)res.pdy)
                                     - MyMath.uint_floordivpow2(try0, (int)res.pdy);
                             precno = prci + prcj * res.pw;
 
@@ -1981,7 +1970,7 @@ namespace OpenJpeg.Internal
         /// Next Component, ProgOrder(y then x), Resolution, Layer
         /// </summary>
         /// <remarks>
-        /// 2.5 - opj_pi_next_cprl
+        /// 2.5.1 - opj_pi_next_cprl
         /// 
         /// Org impl uses goto to jump into a codeblock, that is
         /// not allowed in C#.
@@ -2055,44 +2044,37 @@ namespace OpenJpeg.Internal
 
                             res = comp.resolutions[resno];
                             levelno = comp.numresolutions - 1 - resno;
-                            // Avoids division by zero
-                            // https://github.com/uclouvain/openjpeg/issues/938
-                            if (levelno >= 32 ||
-                                ((comp.dx << (int)levelno) >> (int)levelno) != comp.dx ||
-                                ((comp.dy << (int)levelno) >> (int)levelno) != comp.dy)
+
+                            if ((uint)(((ulong)comp.dx << (int)levelno) >> (int)levelno) != comp.dx ||
+                                (uint)(((ulong)comp.dy << (int)levelno) >> (int)levelno) != comp.dy)
                             {
                                 continue;
                             }
-                            if ((comp.dx << (int) levelno) > int.MaxValue ||
-                                (comp.dy << (int) levelno) > int.MaxValue)
-                            {
-                                continue;
-                            }
-                            trx0 = MyMath.uint_ceildiv(tx0, comp.dx << (int)levelno);
-                            try0 = MyMath.uint_ceildiv(ty0, comp.dy << (int)levelno);
-                            trx1 = MyMath.uint_ceildiv(tx1, comp.dx << (int)levelno);
-                            try1 = MyMath.uint_ceildiv(ty1, comp.dy << (int)levelno);
+
+                            trx0 = MyMath.uint64_ceildiv_res_uint32(tx0, (ulong)comp.dx << (int)levelno);
+                            try0 = MyMath.uint64_ceildiv_res_uint32(ty0, (ulong)comp.dy << (int)levelno);
+                            trx1 = MyMath.uint64_ceildiv_res_uint32(tx1, (ulong)comp.dx << (int)levelno);
+                            try1 = MyMath.uint64_ceildiv_res_uint32(ty1, (ulong)comp.dy << (int)levelno);
                             rpx = res.pdx + levelno;
                             rpy = res.pdy + levelno;
 
-                            // Avoid divisions by zero / undefined behaviour on shift
-                            // https://github.com/uclouvain/openjpeg/issues/938
-                            if (rpx >= 31 || ((comp.dx << (int)rpx) >> (int)rpx) != comp.dx ||
-                                rpy >= 31 || ((comp.dy << (int)rpy) >> (int)rpy) != comp.dy)
+                            if ((uint)(((ulong)comp.dx << (int)rpx) >> (int)rpx) != comp.dx ||
+                                (uint)(((ulong)comp.dy << (int)rpy) >> (int)rpy) != comp.dy)
                             {
                                 continue;
                             }
 
-                            if (!((y % (comp.dy << (int)rpy) == 0) || ((y == ty0) && ((try0 << (int)levelno) % (1u << (int)rpy)) != 0)))
+                            /* See ISO-15441. B.12.1.3 Resolution level-position-component-layer progression */
+                            if (!(((ulong)y % ((ulong)comp.dy << (int)rpy) == 0) || ((y == ty0) && (((ulong)try0 << (int)levelno) % ((ulong)1U << (int)rpy)) != 0)))
                                 continue;
-                            if (!((x % (comp.dx << (int)rpx) == 0) || ((x == tx0) && ((trx0 << (int)levelno) % (1u << (int)rpx)) != 0)))
+                            if (!(((ulong)x % ((ulong)comp.dx << (int)rpx) == 0) || ((x == tx0) && (((ulong)trx0 << (int)levelno) % ((ulong)1U << (int)rpx)) != 0)))
                                 continue;
                             if ((res.pw == 0) || (res.ph == 0)) continue;
                             if ((trx0 == trx1) || (try0 == try1)) continue;
 
-                            prci = MyMath.uint_floordivpow2(MyMath.uint_ceildiv(x, comp.dx << (int)levelno), (int)res.pdx)
+                            prci = MyMath.uint_floordivpow2(MyMath.uint64_ceildiv_res_uint32(x, (ulong)comp.dx << (int)levelno), (int)res.pdx)
                                     - MyMath.uint_floordivpow2(trx0, (int)res.pdx);
-                            prcj = MyMath.uint_floordivpow2(MyMath.uint_ceildiv(y, comp.dy << (int)levelno), (int)res.pdy)
+                            prcj = MyMath.uint_floordivpow2(MyMath.uint64_ceildiv_res_uint32(y, (ulong)comp.dy << (int)levelno), (int)res.pdy)
                                     - MyMath.uint_floordivpow2(try0, (int)res.pdy);
                             precno = prci + prcj * res.pw;
                             

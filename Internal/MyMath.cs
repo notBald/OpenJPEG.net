@@ -30,6 +30,15 @@
             return (a + b - 1) / b;
         }
 
+        /// <summary>
+        /// Divide an integer and round upwards
+        /// </summary>
+        /// <remarks>2.5.1 - opj_uint64_ceildiv_res_uint32</remarks>
+        public static uint uint64_ceildiv_res_uint32(ulong a, ulong b)
+        {
+            return (uint) ((a + b - 1) / b);
+        }
+
         public static int int_max(int a, int b)
         {
             return (a > b) ? a : b;
