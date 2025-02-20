@@ -22,12 +22,12 @@
 
         public static int int_ceildiv(int a, int b) 
         {
-	        return (a + b - 1) / b;
+	        return (int)(((long)a + b - 1) / b);
         }
 
         public static uint uint_ceildiv(uint a, uint b)
         {
-            return (a + b - 1) / b;
+            return (uint)(((long)a + b - 1) / b);
         }
 
         /// <summary>
