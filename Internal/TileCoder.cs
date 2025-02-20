@@ -600,7 +600,7 @@ namespace OpenJpeg.Internal
                             // call.
 
                             if ((layer_allocation_is_same && !last_layer_allocation_ok) ||
-                                (!last_layer_allocation_ok &&
+                                (!layer_allocation_is_same &&
                                  !t2.EncodePackets(_tcd_tileno, tcd_tile, layno + 1, dest, 
                                                    out data_written, (uint)maxlen, null, _cur_tp_num, _tp_pos, 
                                                    _cur_pino, 
@@ -764,7 +764,6 @@ namespace OpenJpeg.Internal
             bool layer_allocation_is_same = true;
 
             tcd_tile.distolayer[layno] = 0;
-
 
             for (uint compno = 0; compno < tcd_tile.numcomps; compno++)
             {
