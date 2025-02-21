@@ -47,7 +47,7 @@ namespace OpenJpeg.Util
             {
                 if (pixels_pos == last_rasterline_pos)
                 {
-                    //This is a slight optimilization. Since the pixels_pos hasn't
+                    //This is a slight optimization. Since the pixels_pos hasn't
                     //moved it means that the line scaling algo will give the exact
                     //same result. We therefore simply copy the old result.
                     Array.Copy(dest, dest_pos - width, dest, dest_pos, width); //<-- todo: use BufferCopy instead

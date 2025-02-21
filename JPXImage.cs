@@ -49,7 +49,7 @@ namespace OpenJpeg
     /// resolution and bits.
     /// 
     /// J2K supports monocrome, RGB and YUV colorspaces. Alpha is also supported,
-    /// ie. RGBA, YUVA, GRAYA (Where alpha is the last component)
+    /// ie. RGBA, YUVA, GRAYA.
     /// </summary>
     public class JPXImage
     {
@@ -72,10 +72,6 @@ namespace OpenJpeg
         /// When decoding J2K files the resulting color space will 
         /// alwyas be RGB(A) or GRAY. Where Gray is 1 or 2 components, and
         /// RGB is 3 or 4 components.
-        /// 
-        /// IOW if this is to be exposed publically there should be a
-        /// bit of logic that presents the propper color space to the
-        /// reader.
         /// </remarks>
         internal COLOR_SPACE color_space;
 
@@ -131,7 +127,7 @@ namespace OpenJpeg
         }
 
         /// <summary>
-        /// The maximum bits per component for this image.
+        /// If all channels have the same bit depth
         /// </summary>
         public bool UniformBPC
         {
@@ -146,7 +142,7 @@ namespace OpenJpeg
         }
 
         /// <summary>
-        /// The maximum bits per component for this image.
+        /// If all channels have the same widht / height
         /// </summary>
         public bool UniformSize
         {
@@ -615,7 +611,7 @@ namespace OpenJpeg
         /// <remarks>
         /// 2.5 - color_esycc_to_rgb
         /// 
-        /// This code has been adopted from sjpx_openjpeg.c of ghostscript
+        /// This code has been adapted from sjpx_openjpeg.c of ghostscript
         /// </remarks>
         public bool ESyccToRGB(CompressionInfo cinfo = null)
         {

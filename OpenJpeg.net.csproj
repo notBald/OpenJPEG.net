@@ -91,5 +91,8 @@
     <Compile Include="Util\LinearInterpolator.cs" />
     <Compile Include="Util\Scaler.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Readme.md" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
