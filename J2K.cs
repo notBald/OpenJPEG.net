@@ -5937,6 +5937,9 @@ namespace OpenJpeg
                     if (bandno < Constants.J2K_MAXBANDS)
                         tccp.stepsizes[bandno] = new StepSize((int)(tmp >> 3), 0);
                 }
+
+                if (header_size < num_bands)
+                    return false;
                 header_size -= num_bands;
             }
             else
@@ -5947,6 +5950,9 @@ namespace OpenJpeg
                     if (bandno < Constants.J2K_MAXBANDS)
                         tccp.stepsizes[bandno] = new StepSize((int)(tmp >> 11), (int)(tmp & 0x7ff));
                 }
+
+                if (header_size < 2 * num_bands)
+                    return false;
                 header_size -= 2 * num_bands;
             }
 

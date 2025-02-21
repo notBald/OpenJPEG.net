@@ -1676,6 +1676,8 @@ namespace OpenJpeg.Internal
 
                 // Concatenate all chunks
                 cblkdata = cblkdatabuffer;
+                if (cblkdata == null)
+                    return false;
                 cblk_len = 0;
                 for (int i = 0; i < cblk.numchunks; i++)
                 {

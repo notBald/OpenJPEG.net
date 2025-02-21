@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace OpenJpeg.Internal
 {
+    /// <summary>
+    /// Some functions, like opj_t1_ht_decode_cblk, is in Tier1Coding.cs
+    /// </summary>
     internal static class ht_dec
     {
         /// <summary>
