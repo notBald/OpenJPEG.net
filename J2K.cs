@@ -5299,7 +5299,7 @@ namespace OpenJpeg
         /// Merges all PPM markers read (Packed headers, main header)
         /// </summary>
         /// <remarks>
-        /// 2.5 - opj_j2k_merge_ppm
+        /// 2.5.1 - opj_j2k_merge_ppm
         /// </remarks>
         internal bool MergePPM()
         {
@@ -5340,9 +5340,13 @@ namespace OpenJpeg
                                 return false;
                             }
                             N_ppm = data.ReadUInt();
-                            ppm_data_size +=
-                                N_ppm; /* can't overflow, max 256 markers of max 65536 bytes, that is when PPM markers are not corrupted which is checked elsewhere */
 
+                            if (ppm_data_size > uint.MaxValue - N_ppm)
+                            {
+                                _cinfo.Error("Too large value for Nppm\n");
+                                return false;
+                            }
+                            ppm_data_size += N_ppm;
                             if (data.BytesLeft >= N_ppm)
                             {
                                 data.Skip((int) N_ppm);
