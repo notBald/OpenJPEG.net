@@ -412,7 +412,7 @@ namespace OpenJpeg.Internal
             return true;
         }
 
-        //2.5 - opj_t2_skip_packet_data
+        //2.5.1 - opj_t2_skip_packet_data
         bool SkipPacketData(TcdTile tile, PacketIterator pi, byte[] src, int src_pos, out int data_read, int max_length)
         {
             Debug.Assert(max_length == src.Length - src_pos); //max_length can be dropped
@@ -469,6 +469,7 @@ namespace OpenJpeg.Internal
                             {
                                 _cinfo.Warn(msg, seg.newlen, max_length, cblkno,
                                     pi.precno, bandno, pi.resno, pi.compno);
+                                return true;
                             }
                         }
                        
