@@ -325,7 +325,7 @@ namespace OpenJpeg
 
         #endregion
 
-        //2.5
+        //2.5.1 - opj_jp2_read_header
         internal bool ReadHeader(out JPXImage image)
         {
             //Snip decoding validation (NOP)
@@ -352,7 +352,17 @@ namespace OpenJpeg
                 return false;
             }
 
-            return _j2k.ReadHeader(out image);
+            var ret = _j2k.ReadHeader(out image);
+
+            // Set Image Color Space
+            if (11 <= _enumcs && _enumcs <= 18 && _enumcs != 15)
+                image.color_space = (COLOR_SPACE)_enumcs;
+            else if (_enumcs == 24)
+                image.color_space = COLOR_SPACE.eYCC;
+            else
+                image.color_space = COLOR_SPACE.UNKNOWN;
+
+            return ret;
         }
 
         //2.5 - opj_jp2_read_header_procedure
@@ -487,17 +497,9 @@ namespace OpenJpeg
 
         delegate bool Handeler(JP2Box box);
 
-        //2.5 - opj_jp2_decode
-        internal bool Decode(JPXImage image)
+        //2.5.1 - opj_jp2_apply_color_postprocessing
+        bool ApplyColorPostprocessing(JPXImage image)
         {
-            if (image == null) return false;
-
-            if (!_j2k.Decode(image))
-            {
-                _cinfo.Error("Failed to decode the codestream in the JP2 file");
-                return false;
-            }
-
             if (_j2k.NumcompsToDecode != 0)
             {
                 // Bypass all JP2 component transforms
@@ -508,15 +510,6 @@ namespace OpenJpeg
             {
                 if (!CheckColor(image))
                     return false;
-
-                /* Set Image Color Space */
-                if (11 <= _enumcs && _enumcs <= 18 && _enumcs != 15)
-                    image.color_space = (COLOR_SPACE)_enumcs;
-                else if (_enumcs == 24)
-                    image.color_space = COLOR_SPACE.eYCC;
-                else
-                    image.color_space = COLOR_SPACE.UNKNOWN;
-
 
                 if (_color.jp2_pclr != null)
                 {
@@ -550,13 +543,28 @@ namespace OpenJpeg
                     _color.icc_profile_buf = null;
                 }
             }
+
             return true;
+        }
+
+        //2.5.1 - opj_jp2_decode
+        internal bool Decode(JPXImage image)
+        {
+            if (image == null) return false;
+
+            if (!_j2k.Decode(image))
+            {
+                _cinfo.Error("Failed to decode the codestream in the JP2 file");
+                return false;
+            }
+
+            return ApplyColorPostprocessing(image);
         }
 
         /// <summary>
         /// Decodes a single tile in the image
         /// </summary>
-        /// <remarks>2.5 - opj_jp2_get_tile</remarks>
+        /// <remarks>2.5.1 - opj_jp2_get_tile</remarks>
         internal bool Decode(JPXImage image, uint tile_nr)
         {
             if (image == null)
@@ -570,58 +578,7 @@ namespace OpenJpeg
                 return false;
             }
 
-            if (_j2k.NumcompsToDecode != 0)
-            {
-                // Bypass all JP2 component transforms
-                return true;
-            }
-
-            if (!_color.ignore_pclr_cmap_cdef)
-            {
-                if (!CheckColor(image))
-                    return false;
-
-                // Set Image Color Space
-                if (11 <= _enumcs && _enumcs <= 18 && _enumcs != 15)
-                    image.color_space = (COLOR_SPACE)_enumcs;
-                else if (_enumcs == 24)
-                    image.color_space = COLOR_SPACE.eYCC;
-                else
-                    image.color_space = COLOR_SPACE.UNKNOWN;
-
-
-                if (_color.jp2_pclr != null)
-                {
-                    /* Part 1, I.5.3.4: Either both or none : */
-                    if (_color.jp2_pclr.cmap == null)
-                        _color.jp2_pclr = null;
-                    else
-                    {
-                        if (!_color.ignore_cmap)
-                        {
-                            if (!ApplyPCLR(image, _color, _cinfo))
-                                return false;
-                        }
-                        else
-                        {
-                            return false;
-                        }
-                    }
-                }
-
-                // Apply the color space if needed
-                if (_color.channel_definitions != null)
-                {
-                    ApplyCDEF(image, _color);
-                }
-
-                if (_color.icc_profile_buf != null)
-                {
-                    image.icc_profile_buf = _color.icc_profile_buf;
-                    _color.icc_profile_buf = null;
-                }
-            }
-            return true;
+            return ApplyColorPostprocessing(image);
         }
 
         //2.5 - opj_jp2_check_color

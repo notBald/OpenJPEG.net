@@ -4563,7 +4563,7 @@ namespace OpenJpeg
             return _specific_param.decoder.state == J2K_STATUS.NONE; 
         }
 
-        //2.5
+        //2.5 - opj_j2k_read_header
         internal bool ReadHeader(out JPXImage image)
         {
             _private_image = new JPXImage();
