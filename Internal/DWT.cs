@@ -632,7 +632,7 @@ namespace OpenJpeg.Internal
         /// <summary>
         /// Inverse 9-7 wavelet transform in 2-D.
         /// </summary>
-        /// <remarks>2.5 - opj_dwt_decode_tile_97</remarks>
+        /// <remarks>2.5.1 - opj_dwt_decode_tile</remarks>
         internal static bool decode_tile_97(TcdTilecomp tilec, uint numres, bool disable_multi_threading)
         {
             v4dwt_local h = new v4dwt_local();
@@ -654,7 +654,9 @@ namespace OpenJpeg.Internal
             ulong data_size;
             int num_threads;
 
-            if (numres == 1U)
+            // Not entirely sure for the return code of w == 0 which is triggered per
+            // https://github.com/uclouvain/openjpeg/issues/1505
+            if (numres == 1U || w == 0)
             {
                 return true;
             }

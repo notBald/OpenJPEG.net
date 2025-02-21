@@ -1835,7 +1835,7 @@ namespace OpenJpeg.Internal
             return true;
         }
 
-        //2.5 - opj_tcd_dc_level_shift_decode
+        //2.5.1 - opj_tcd_dc_level_shift_decode
         void DcLevelShiftDecode()
         {
             TcdTile tile = _tcd_image.tiles[0];
@@ -1883,6 +1883,9 @@ namespace OpenJpeg.Internal
                     min = 0;
                     max = (1 << (int)imagec.prec) - 1;
                 }
+
+                if (width == 0 || height == 0)
+                    continue;
 
                 if (_tcp.tccps[compno].qmfbid == 1)
                 {

@@ -665,7 +665,21 @@ namespace OpenJpeg.Internal
                             i++;
 
                         cblk.Mb = (uint)band.numbps;
-                        cblk.numbps = (uint)band.numbps + 1 - i;
+
+                        if ((uint)band.numbps + 1 < i)
+                        {
+                            // Not totally sure what we should do in that situation,
+                            // but that avoids the integer overflow of
+                            // https://github.com/uclouvain/openjpeg/pull/1488
+                            // while keeping the regression test suite happy.
+                            cblk.numbps = (uint)(band.numbps + 1 - (int)i);
+                        }
+                        else
+                        {
+                            cblk.numbps = (uint)band.numbps + 1 - i;
+                        }
+
+
                         cblk.numlenbits = 3;
                     }
 
