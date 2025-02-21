@@ -355,13 +355,21 @@ namespace OpenJpeg
             var ret = _j2k.ReadHeader(out image);
 
             // Set Image Color Space
-            if (11 <= _enumcs && _enumcs <= 18 && _enumcs != 15)
-                image.color_space = (COLOR_SPACE)_enumcs;
-            else if (_enumcs == 24)
-                image.color_space = COLOR_SPACE.eYCC;
-            else
-                image.color_space = COLOR_SPACE.UNKNOWN;
+            if (image != null)
+            {
+                if (11 <= _enumcs && _enumcs <= 18 && _enumcs != 15)
+                    image.color_space = (COLOR_SPACE)_enumcs;
+                else if (_enumcs == 24)
+                    image.color_space = COLOR_SPACE.eYCC;
+                else
+                    image.color_space = COLOR_SPACE.UNKNOWN;
 
+                if (_color.icc_profile_buf != null)
+                {
+                    image.icc_profile_buf = _color.icc_profile_buf;
+                    _color.icc_profile_buf = null;
+                }
+            }
             return ret;
         }
 
@@ -536,12 +544,6 @@ namespace OpenJpeg
                 {
                     ApplyCDEF(image, _color);
                 }
-
-                if (_color.icc_profile_buf != null)
-                {
-                    image.icc_profile_buf = _color.icc_profile_buf;
-                    _color.icc_profile_buf = null;
-                }
             }
 
             return true;
@@ -550,7 +552,8 @@ namespace OpenJpeg
         //2.5.1 - opj_jp2_decode
         internal bool Decode(JPXImage image)
         {
-            if (image == null) return false;
+            if (image == null) 
+                return false;
 
             if (!_j2k.Decode(image))
             {
