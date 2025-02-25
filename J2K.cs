@@ -3814,8 +3814,8 @@ namespace OpenJpeg
                 {
                     return false;
                 }
-
-                if (!DecodeTile(current_tile_no, null))
+                
+                if (!go_on || !DecodeTile(current_tile_no, null))
                 {
                     _cinfo.Error("Failed to decode tile 1/1");
                     return false;
