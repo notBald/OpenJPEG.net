@@ -4349,6 +4349,11 @@ namespace OpenJpeg
 
                     if ((_specific_param.decoder.state & J2K_STATUS.TPH) != 0)
                     {
+                        if (_specific_param.decoder.sot_length < marker_size + 2)
+                        {
+                            _cinfo.Error("Sot length is less than marker size + marker ID");
+                            return false;
+                        }
                         _specific_param.decoder.sot_length -= marker_size + 2;
                     }
                     marker_size -= 2; // Subtract the size of the marker ID already read
