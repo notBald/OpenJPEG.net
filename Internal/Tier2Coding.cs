@@ -415,7 +415,6 @@ namespace OpenJpeg.Internal
         //2.5.3 - opj_t2_skip_packet_data
         bool SkipPacketData(TcdTile tile, PacketIterator pi, byte[] src, int src_pos, out int data_read, int max_length)
         {
-            Debug.Assert(max_length == src.Length - src_pos); //max_length can be dropped
             TcdResolution res = tile.comps[pi.compno].resolutions[pi.resno];
             data_read = 0;
             int start_pos = src_pos;
