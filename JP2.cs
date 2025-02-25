@@ -143,7 +143,7 @@ namespace OpenJpeg
             //_procedure_list = new List<ProcedureDlg>();
         }
 
-        //2.5 - opj_jp2_setup_encoder
+        //2.5.3 - opj_jp2_setup_encoder
         internal bool SetupEncoder(CompressionParameters parameters, JPXImage image)
         {
             if (parameters == null || image == null)
