@@ -429,6 +429,7 @@ namespace OpenJpeg.Internal
     /// <summary>
     /// Tile coding/decoding codeblock decoder
     /// </summary>
+    /// <remarks>2.5.3 - opj_tcd_cblk_dec</remarks>
     internal sealed class TcdCblkDec
     {
         /// <summary>
@@ -526,6 +527,10 @@ namespace OpenJpeg.Internal
         /// </summary>
         internal int[] decoded_data;
 
+        /// <summary>
+        /// Whether the code block data is corrupted
+        /// </summary>
+        internal bool corrupted;
         internal void Reset()
         {
             Mb = 0;

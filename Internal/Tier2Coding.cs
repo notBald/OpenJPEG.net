@@ -287,7 +287,7 @@ namespace OpenJpeg.Internal
             return true;
         }
 
-        //2.5 - opj_t2_read_packet_data
+        //2.5.3 - opj_t2_read_packet_data
         bool ReadPacketData(TcdTile tile, PacketIterator pi, byte[] src, int src_pos, out int data_read, int max_length)
         {
             TcdResolution res = tile.comps[pi.compno].resolutions[pi.resno];
@@ -315,15 +315,21 @@ namespace OpenJpeg.Internal
                     //C# retains a reference to the data array
                     cblk.chunk_data = src;
 
-                    // If we have a partial data stream, set numchunks to zero
-                    // since we have no data to actually decode.
-                    if (partial_buffer)
+                    if (cblk.numnewpasses == 0)
                     {
-                        cblk.numchunks = 0;
+                        //Nothing to do
+                        continue;
                     }
 
-                    if (cblk.numnewpasses == 0)
+                    if (partial_buffer || cblk.corrupted)
+                    {
+                        //if a previous segment in this packet couldn't be decoded,
+                        //or if this code block was corrupted in a previous layer,
+                        //then mark it as corrupted.
+                        cblk.numchunks = 0;
+                        cblk.corrupted = true;
                         continue;
+                    }
 
                     if (cblk.numsegs == 0)
                     {
@@ -359,18 +365,12 @@ namespace OpenJpeg.Internal
                             {
                                 _cinfo.Warn("read: segment too long ({0}) with max ({1}) for codeblock {2} (p={3}, b={4}, r={5}, c={6})",
                                     seg.newlen, max_length, cblkno, pi.precno, bandno, pi.resno, pi.compno);
+                                //skip this codeblock (and following ones in this packet) since it is a partial read
                                 partial_buffer = true;
+                                cblk.corrupted = true;
                                 cblk.numchunks = 0;
 
-                                seg.numpasses += seg.numnewpasses;
-                                cblk.numnewpasses -= seg.numnewpasses;
-                                if (cblk.numnewpasses > 0)
-                                {
-                                    //C# ++seg serves no purpose. Isn't used outside this loop.
-                                    cblk.numsegs++;
-                                    break;
-                                }
-                                continue;
+                                break;
                             }
                         }
                         if (cblk.numchunks == cblk.numchunksalloc)
@@ -412,7 +412,7 @@ namespace OpenJpeg.Internal
             return true;
         }
 
-        //2.5.1 - opj_t2_skip_packet_data
+        //2.5.3 - opj_t2_skip_packet_data
         bool SkipPacketData(TcdTile tile, PacketIterator pi, byte[] src, int src_pos, out int data_read, int max_length)
         {
             Debug.Assert(max_length == src.Length - src_pos); //max_length can be dropped
@@ -469,6 +469,8 @@ namespace OpenJpeg.Internal
                             {
                                 _cinfo.Warn(msg, seg.newlen, max_length, cblkno,
                                     pi.precno, bandno, pi.resno, pi.compno);
+
+                                data_read = max_length;
                                 return true;
                             }
                         }

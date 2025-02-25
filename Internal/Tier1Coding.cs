@@ -3238,7 +3238,7 @@ namespace OpenJpeg.Internal
             return true;
         }
 
-        //2.5 - opj_t1_decode_cblk
+        //2.5.3 - opj_t1_decode_cblk
         private bool DecodeCblk(TcdCblkDec cblk,
                                   uint orient,
                                   uint roishift,
@@ -3271,7 +3271,16 @@ namespace OpenJpeg.Internal
             _mqc.SetState(T1_CTXNO.AGG, 0, 3);
             _mqc.SetState(T1_CTXNO.ZC, 0, 4);
 
-            if (cblk.numchunks > 1 || mustuse_cblkdatabuffer)
+            if (cblk.corrupted)
+            {
+                Debug.Assert(cblk.numchunks == 0);
+                return true;
+            }
+
+            //Even if we have a single chunk, in multi-threaded decoding
+            //the insertion of our synthetic marker might potentially override
+            //valid codestream of other codeblocks decoded in parallel.
+            if (cblk.numchunks > 1 || (mustuse_cblkdatabuffer && cblk.numchunks > 0))
             {
                 //Compute whole codeblock length from chunk lengths
                 uint cblk_len = 0;
