@@ -792,6 +792,13 @@ namespace OpenJpeg.Internal
             //Original 2.1 impl modifies the array references, which is something
             //C# does not trivially allow. 
             header_length = hd_pos - hd_start_pos;
+            if (header_length == 0)
+            {
+                is_data_present = false;
+                data_dread = 0;
+                return false;
+            }
+
             modified_length_ptr -= header_length;
             hd_start_pos += header_length;
 
