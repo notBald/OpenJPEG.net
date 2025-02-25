@@ -4158,6 +4158,7 @@ namespace OpenJpeg
                 _specific_param.decoder.numcomps_to_decode,
                 _specific_param.decoder.comps_indices_to_decode,
                 tcp.data, 
+                tcp.data_size,
                 tile_index,
                 _cstr_index))
             {
@@ -5022,7 +5023,7 @@ namespace OpenJpeg
             return true;
         }
 
-        //2.5
+        //2.5 - opj_j2k_read_sod
         internal bool ReadSOD()
         {
             TileCodingParams tcp = _cp.tcps[_current_tile_number];

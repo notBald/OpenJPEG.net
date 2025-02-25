@@ -118,6 +118,29 @@ namespace OpenJpeg.Internal
         }
 
         /// <summary>
+        /// Can read up to 32 bits out of the bitstream. Reads "0" if reading
+        /// beyond the end of the stream.
+        /// </summary>
+        /// <param name="n">Number of bits to fetch, max is 32</param>
+        /// <returns>The bits in the lower end of a int</returns>
+        /// <remarks>
+        /// Special note: 0xff skips the next bit. Because of
+        /// this I suspect that there's never reads above 8 bits, so
+        /// this function may not be needed.
+        /// </remarks>
+        internal uint ReadUInt0(uint n)
+        {
+            uint ret = 0;
+            while (n > 8)
+            {
+                //Debug.Assert(false, "I suspect there will never be a need for this");
+                ret = ret << 8 | (uint)Read0(8);
+                n -= 8;
+            }
+            return ret << (int)n | (uint)Read0((int)n);
+        }
+
+        /// <summary>
         /// Reads bits out of the bitstream.
         /// </summary>
         /// <param name="n">Number of bits to fetch, max is 8</param>
@@ -141,6 +164,51 @@ namespace OpenJpeg.Internal
                 else
                 {
                     bit_buffer = _data[_data_pos++];
+                    n_buf_bits = 8 - n;
+                    ret |= (bit_buffer & 0xff) >> n_buf_bits;
+                }
+            }
+            else
+                n_buf_bits -= n;
+            bit_buffer <<= n;
+            return ret;
+        }
+
+        /// <summary>
+        /// Reads bits out of the bitstream.
+        /// 
+        /// In the original impl, if one read beyond the end of a
+        /// stream it simply read "0" bits. To match that impl.
+        /// we use this function.
+        /// </summary>
+        /// <param name="n">Number of bits to fetch, max is 8</param>
+        /// <returns>
+        /// The bits in the lower end of a int, or 0 at the end of
+        /// the stream.
+        /// </returns>
+        internal int Read0(int n)
+        {
+            int ret = (bit_buffer & 0xff) >> (8 - n);
+            if (n > n_buf_bits)
+            {
+                n -= n_buf_bits;
+                if (((bit_buffer << n_buf_bits) & 0xff00) == 0xff00)
+                {
+                    //Skips over 1 bit of data
+                    if (_data_pos == _end_pos)
+                        bit_buffer = 0;
+                    else
+                        bit_buffer = _data[_data_pos++];
+                    bit_buffer <<= 1;
+                    n_buf_bits = 7 - n;
+                    ret |= (bit_buffer & 0xff) >> (8 - n);
+                }
+                else
+                {
+                    if (_data_pos == _end_pos)
+                        bit_buffer = 0;
+                    else
+                        bit_buffer = _data[_data_pos++];
                     n_buf_bits = 8 - n;
                     ret |= (bit_buffer & 0xff) >> n_buf_bits;
                 }

@@ -49,6 +49,7 @@ namespace OpenJpeg.Internal
     /// 
     /// Tier-2 fins the optimal truncation points, given a target bitrate.
     /// </summary>
+    /// <remarks>t2.c</remarks>
     internal sealed class Tier2Coding
     {
         #region Variables and properties
@@ -95,7 +96,7 @@ namespace OpenJpeg.Internal
         /// 2.5 - opj_t2_decode_packets
         /// C# The max_length parameter is not included, as it's just src.Length
         /// </remarks>
-        internal bool DecodePackets(TileCoder tcd, uint tileno, TcdTile tile, byte[] src, CodestreamIndex cstr_index)
+        internal bool DecodePackets(TileCoder tcd, uint tileno, TcdTile tile, byte[] src, int max_length, CodestreamIndex cstr_index)
         {
             var tcp = _cp.tcps[tileno];
             PacketIterator[] pi_ar = PacketIterator.CreateDecode(_image, _cp, tileno, _cinfo);
@@ -104,8 +105,7 @@ namespace OpenJpeg.Internal
                 return false;
             }
 
-            //C# max_length is a parameter in the org impl.
-            int n_bytes_read, max_length = src.Length;
+            int n_bytes_read;
 
             //C#: Position in the src stream
             int src_pos = 0;
@@ -491,10 +491,11 @@ namespace OpenJpeg.Internal
             return true;
         }
 
-        //2.5
+
+        /// <param name="max_length">How much data can be read from src, can be shorter than "src.Lenght - src_pos"</param>
+        /// <remarks>2.5.3 - opj_t2_read_packet_header</remarks>>
         bool ReadPacketHeader(TcdTile tile, TileCodingParams tcp, PacketIterator pi, out bool is_data_present, byte[] src, int src_pos, out int data_dread, int max_length)
         {
-            Debug.Assert(max_length == src.Length - src_pos); //max_length can be dropped
             int start_pos = src_pos; //<-- Used to calc num read
             int header_length;
 
@@ -536,10 +537,11 @@ namespace OpenJpeg.Internal
 
             if ((tcp.csty & CP_CSTY.SOP) == CP_CSTY.SOP)
             {
+                // SOP markers are allowed (i.e. optional), just warn
                 if (max_length < 6)
-                    _cinfo.Error("Not enough space for expected SOP marker");
+                    _cinfo.Warn("Not enough space for expected SOP marker");
                 else if (src[src_pos] != 0xff || src[src_pos + 1] != 0x91)
-                    _cinfo.Error("Expected SOP marker");
+                    _cinfo.Warn("Expected SOP marker");
                 else
                     src_pos += 6;
 
@@ -590,10 +592,21 @@ namespace OpenJpeg.Internal
                 // EPH markers
                 if ((tcp.csty & CP_CSTY.EPH) == CP_CSTY.EPH)
                 {
-                    if (max_length < 2)
+                    // EPH markers are required
+                    if (modified_length_ptr - (hd_pos - hd_start_pos) < 2)
+                    {
                         _cinfo.Error("Not enough space for expected EPH marker");
+                        data_dread = 0;
+                        is_data_present = false;
+                        return false;
+                    }
                     else if (header_data[hd_pos] != 0xff || header_data[hd_pos + 1] != 0x92)
+                    {
                         _cinfo.Error("Expected EPH marker");
+                        data_dread = 0;
+                        is_data_present = false;
+                        return false;
+                    }
                     else
                         hd_pos += 2;
                 }
@@ -665,21 +678,7 @@ namespace OpenJpeg.Internal
                             i++;
 
                         cblk.Mb = (uint)band.numbps;
-
-                        if ((uint)band.numbps + 1 < i)
-                        {
-                            // Not totally sure what we should do in that situation,
-                            // but that avoids the integer overflow of
-                            // https://github.com/uclouvain/openjpeg/pull/1488
-                            // while keeping the regression test suite happy.
-                            cblk.numbps = (uint)(band.numbps + 1 - (int)i);
-                        }
-                        else
-                        {
-                            cblk.numbps = (uint)band.numbps + 1 - i;
-                        }
-
-
+                        cblk.numbps = (uint)band.numbps + 1 - i;
                         cblk.numlenbits = 3;
                     }
 
@@ -701,7 +700,7 @@ namespace OpenJpeg.Internal
                         if (cblk.segs[segno].numpasses == cblk.segs[segno].maxpasses)
                             InitSegment(cblk, ++segno, tcp.tccps[pi.compno].cblksty, false);
                     }
-                    int n = (int) cblk.numnewpasses;
+                    int n = (int)cblk.numnewpasses;
 
                     if ((tcp.tccps[pi.compno].cblksty & CCP_CBLKSTY.HT) != 0)
                     {
@@ -746,7 +745,7 @@ namespace OpenJpeg.Internal
                                 data_dread = 0;
                                 return false;
                             }
-                            cblk.segs[segno].newlen = bio.ReadUInt(bit_number);
+                            cblk.segs[segno].newlen = bio.ReadUInt0(bit_number);
 
                             n -= (int)cblk.segs[segno].numnewpasses;
                             if (n > 0)
@@ -770,10 +769,21 @@ namespace OpenJpeg.Internal
             //EPH markers
             if ((tcp.csty & CP_CSTY.EPH) == CP_CSTY.EPH)
             {
-                if (max_length < 2)
+                //EPH markers are required
+                if (modified_length_ptr - (hd_pos - hd_start_pos) < 2)
+                {
                     _cinfo.Error("Not enough space for expected EPH marker");
+                    is_data_present = false;
+                    data_dread = 0;
+                    return false;
+                }
                 else if (header_data[hd_pos] != 0xff || header_data[hd_pos + 1] != 0x92)
+                {
                     _cinfo.Error("Expected EPH marker");
+                    is_data_present = false;
+                    data_dread = 0;
+                    return false;
+                }
                 else
                     hd_pos += 2;
             }
@@ -1245,7 +1255,7 @@ namespace OpenJpeg.Internal
                 return (3 + n);
             if ((n = (uint)bio.Read(5)) != 31)
                 return (6 + n);
-            return (37 + (uint)bio.Read(7));
+            return (37 + (uint)bio.Read0(7));
         }
 
         //2.5.1 - opj_t2_putcommacode

@@ -1463,11 +1463,11 @@ namespace OpenJpeg.Internal
         #endregion
 
         //2.5
-        bool T2Decode(byte[] src, CodestreamIndex cstr_index)
+        bool T2Decode(byte[] src, int src_len, CodestreamIndex cstr_index)
         {
             Tier2Coding t2 = new Tier2Coding(_cinfo, _image, _cp);
 
-            return t2.DecodePackets(this, _tcd_tileno, _tcd_image.tiles[0], src, cstr_index);
+            return t2.DecodePackets(this, _tcd_tileno, _tcd_image.tiles[0], src, src_len, cstr_index);
         }
 
         /// <remarks>
@@ -1960,7 +1960,8 @@ namespace OpenJpeg.Internal
             uint win_y1,
             int numcomps_to_decode,
             int[] comps_indices,
-            byte[] src, 
+            byte[] src,
+            int src_len,
             uint tileno,
             CodestreamIndex cstr_index)
         {
@@ -2093,7 +2094,7 @@ namespace OpenJpeg.Internal
             }
 
             //// --------------- Tier 2 -------------
-            if (!T2Decode(src, cstr_index))
+            if (!T2Decode(src, src_len, cstr_index))
                 return false;
 
             //DumpCblks("");
