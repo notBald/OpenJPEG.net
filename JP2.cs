@@ -442,7 +442,7 @@ namespace OpenJpeg
                     }
                     
                     // Skip unkown boxes
-                    _cio.Skip((int)current_data_size);
+                    _cio.Skip(current_data_size);
                 }
             }
 
@@ -963,13 +963,13 @@ namespace OpenJpeg
                         //   for a box before calling the handler. 
                         _cinfo.Warn("{0} box has {1} bytes of junk data",
                             box.type, box.data_length - (_cio.Pos - pos));
-                        _cio.Skip((int)(box.data_length - (_cio.Pos - pos)));
+                        _cio.Skip((uint)(box.data_length - (_cio.Pos - pos)));
                     }
                 }
                 else
                 {
                     _img_state |= JP2_IMG_STATE.UNKNOWN;
-                    _cio.Skip((int)box.data_length);
+                    _cio.Skip(box.data_length);
                 }
 
                 header_size -= box.length;
@@ -1167,7 +1167,7 @@ namespace OpenJpeg
             if (_color.HasColor)
             {
                 _cinfo.Info("A conforming JP2 reader shall ignore all Colour Specification boxes after the first, so we ignore this one.");
-                _cio.Skip((int) box.data_length);
+                _cio.Skip(box.data_length);
                 return true;
             }
 
@@ -1243,7 +1243,7 @@ namespace OpenJpeg
             {
                 /*	ISO/IEC 15444-1:2004 (E), Table I.9 ­ Legal METH values:
                     conforming JP2 reader shall ignore the entire Colour Specification box.*/
-                _cio.Skip((int) box.data_length - 3);
+                _cio.Skip(box.data_length - 3);
             }
 
 	        return true;
@@ -1416,7 +1416,7 @@ namespace OpenJpeg
             if (_cio.BytesLeft < 8)
             {
                 n_bytes_read = (int)_cio.BytesLeft;
-                _cio.Skip((int)n_bytes_read);
+                _cio.Skip((uint)n_bytes_read);
                 return false;
             }
 

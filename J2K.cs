@@ -3629,7 +3629,7 @@ namespace OpenJpeg
             return true;
         }
 
-        //2.5
+        //2.5 - opj_j2k_allocate_tile_element_cstr_index
         private void AllocateTileElementCstrIndex()
         {
             _cstr_index.n_of_tiles = _cp.tw * _cp.th;
@@ -3690,7 +3690,7 @@ namespace OpenJpeg
         /// <summary>
         /// Read and decode one tile.
         /// </summary>
-        /// <remarks>2.5 - opj_j2k_decode_one_tile</remarks>
+        /// <remarks>2.5.3 - opj_j2k_decode_one_tile</remarks>
         bool DecodeOneTile()
         {
             bool go_on = true;
@@ -3699,22 +3699,12 @@ namespace OpenJpeg
             int tile_x0, tile_y0, tile_x1, tile_y1;
             uint n_comps;
 
-            // Allocate and initialize some elements of codestrem index if not already done
-            if (_cstr_index.tile_index == null)
-                AllocateTileElementCstrIndex();
-
             // Move into the codestream to the first SOT used to decode the desired tile
             var tile_no_to_dec = (uint)_specific_param.decoder.tile_ind_to_dec;
             if (_cstr_index.tile_index != null)
             {
                 if (_cstr_index.tile_index[0].tp_index != null)
                 {
-                    if (!_cio.CanSeek)
-                    {
-                        _cinfo.Error("Problem with seek function");
-                        return false;
-                    }
-
                     if (_cstr_index.tile_index[tile_no_to_dec].n_tps == 0)
                     {
                         // the index for this tile has not been built,
@@ -3723,7 +3713,13 @@ namespace OpenJpeg
                     }
                     else
                     {
-                        _cio.Pos = _cstr_index.tile_index[tile_no_to_dec].tp_index[0].start_pos + 2;
+                        _cio.Pos = _cstr_index.tile_index[tile_no_to_dec].tp_index[0].start_pos;
+
+                        if ((J2K_Marker)_cio.ReadUShort() != J2K_Marker.SOT)
+                        {
+                            _cinfo.Error("Did not get expected SOT marker");
+                            return false;
+                        }
                     }
                     // Special case if we have previously read the EOC marker (if the previous tile getted is the last )
                     if (_specific_param.decoder.state == J2K_STATUS.EOC)
@@ -4287,7 +4283,7 @@ namespace OpenJpeg
                 }
                 l_tot_len -= 12U;
                 /* look for next SOT marker */
-                _cio.Skip(((int) l_tot_len));
+                _cio.Skip(l_tot_len);
             }
 
             /* check for correction */
@@ -4300,7 +4296,7 @@ namespace OpenJpeg
             return true;
         }
 
-        //2.5 - opj_j2k_read_tile_header
+        //2.5.3 - opj_j2k_read_tile_header
         bool ReadTileHeader(out uint tile_index, ref uint? data_size, out int tile_x0, out int tile_y0,
             out int tile_x1, out int tile_y1, out uint n_comps, out bool go_on)
         {
@@ -4383,7 +4379,7 @@ namespace OpenJpeg
                         _specific_param.decoder.header_data_size = (int) marker_size;
                     }
 
-                    if (!handler.Handler((int)marker_size))
+                    if (!handler.Handler(marker_size))
                     {
                         _cinfo.Error("Fail to read the current marker segment ({0:X})", current_marker);
                         return false;
@@ -4403,7 +4399,7 @@ namespace OpenJpeg
                     if (_specific_param.decoder.skip_data)
                     {
                         //Skip the rest of the tile part header
-                        _cio.Skip((int)_specific_param.decoder.sot_length);
+                        _cio.Skip(_specific_param.decoder.sot_length);
                         current_marker = J2K_Marker.SOD;
                     }
                     else
@@ -4420,6 +4416,38 @@ namespace OpenJpeg
                     if (!ReadSOD())
                     {
                         return false;
+                    }
+
+                    // Check if we can use the TLM index to access the next tile-part
+                    if (!_specific_param.decoder.can_decode &&
+                         _specific_param.decoder.tile_ind_to_dec >= 0 &&
+                         _current_tile_number == (OPJ_UINT32) _specific_param.decoder.tile_ind_to_dec &&
+                        !_specific_param.decoder.tlm.is_invalid &&
+                        _cio.CanSeek)
+                    {
+                        var tcp = _cp.tcps[_current_tile_number];
+                        if (tcp.n_tile_parts ==
+                                _cstr_index.tile_index[_current_tile_number].n_tps &&
+                                (OPJ_UINT32)tcp.current_tile_part_number + 1 < tcp.n_tile_parts)
+                        {
+                            long next_tp_sot_pos = _cstr_index.tile_index[_current_tile_number]
+                                  .tp_index[tcp.current_tile_part_number + 1].start_pos;
+
+                            if (next_tp_sot_pos != _cio.Pos)
+                            {
+                                _cio.Pos = next_tp_sot_pos;
+                            }
+
+                            current_marker = (J2K_Marker) _cio.ReadUShort();
+
+                            if (current_marker != J2K_Marker.SOT)
+                            {
+                                _cinfo.Error("Did not get expected SOT marker");
+                                return false;
+                            }
+
+                            continue;
+                        }
                     }
 
                     if (_specific_param.decoder.can_decode &&
@@ -4563,15 +4591,86 @@ namespace OpenJpeg
             return true;
         }
 
-        //2.5
+        //2.5 - opj_j2k_decoding_validation
         bool DecodingValidation()
         {
             return _specific_param.decoder.state == J2K_STATUS.NONE; 
         }
 
-        //2.5 - opj_j2k_read_header
+        void BuildTPIndexFromTLM()
+        {
+            var tlm = _specific_param.decoder.tlm;
+            if (tlm == null)
+            {
+                tlm = new TlmInfo();
+                _specific_param.decoder.tlm = tlm;
+            }
+
+            if (tlm.entries_count == 0 || tlm.is_invalid)
+            {
+                tlm.is_invalid = true;
+                return;
+            }
+
+            // Initial pass to count the number of tile-parts per tile
+            for (int i = 0; i < tlm.entries_count; ++i)
+            {
+                OPJ_UINT32 l_tile_index_no = tlm.tile_part_infos[i].tile_index;
+                Debug.Assert(l_tile_index_no < _cstr_index.n_of_tiles);
+                _cstr_index.tile_index[l_tile_index_no].tileno = l_tile_index_no;
+                ++_cstr_index.tile_index[l_tile_index_no].current_n_tps;
+            }
+
+            // Now check that all tiles have at least one tile-part
+            for (int i = 0; i < _cstr_index.n_of_tiles; ++i)
+            {
+                if (_cstr_index.tile_index[i].current_n_tps == 0)
+                {
+                    _cinfo.Error("opj_j2k_build_tp_index_from_tlm(): tile {0} has no "+
+                                  "registered tile-part in TLM marker segments.", i);
+                    goto error;
+                }
+            }
+
+            // Final pass to fill p_j2k->cstr_index
+            var cur_offset = _cstr_index.main_head_end;
+            for (int i = 0; i < tlm.entries_count; ++i)
+            {
+                OPJ_UINT32 tile_index_no = tlm.tile_part_infos[i].tile_index;
+                var tile_index = _cstr_index.tile_index;
+                if (tile_index[tile_index_no].tp_index == null)
+                {
+                    tile_index[tile_index_no].tp_index = new TPIndex[tile_index[tile_index_no].current_n_tps];
+                }
+
+                Debug.Assert(tile_index[tile_index_no].n_tps < tile_index[tile_index_no].current_n_tps);
+                tile_index[tile_index_no].tp_index[tile_index[tile_index_no].n_tps].start_pos = cur_offset;
+                // We don't know how to set the tp_index[].end_header field, but this is not really needed
+                // If there would be no markers between SOT and SOD, that would be :
+                // l_tile_index->tp_index[l_tile_index->nb_tps].end_header = l_cur_offset + 12;
+                tile_index[tile_index_no].tp_index[tile_index[tile_index_no].n_tps].end_pos = cur_offset +
+                        tlm.tile_part_infos[i].length;
+                ++tile_index[tile_index_no].n_tps;
+
+                cur_offset += tlm.tile_part_infos[i].length;
+            }
+
+            return;
+
+        error:
+            tlm.is_invalid = true;
+            for (int i = 0; i < tlm.entries_count; ++i)
+            {
+                OPJ_UINT32 tile_index = tlm.tile_part_infos[i].tile_index;
+                _cstr_index.tile_index[tile_index].current_n_tps = 0;
+                _cstr_index.tile_index[tile_index].tp_index = null;
+            }
+        }
+
+        //2.5.3 - opj_j2k_read_header
         internal bool ReadHeader(out JPXImage image)
         {
+            // create an empty image header
             _private_image = new JPXImage();
 
             if (!DecodingValidation())
@@ -4594,9 +4693,6 @@ namespace OpenJpeg
 
             image = new JPXImage();
             image.CopyImageHeader(_private_image);
-
-            // Allocate and initialize some elements of codestrem index
-            AllocateTileElementCstrIndex();
 
             return true;
         }
@@ -4681,7 +4777,7 @@ namespace OpenJpeg
             return true;
         }
 
-        //2.5 - opj_j2k_read_header_procedure
+        //2.5.3 - opj_j2k_read_header_procedure
         bool ReadHeaderProcedure()
         {
             _specific_param.decoder.state = J2K_STATUS.MHSOC;
@@ -4699,6 +4795,7 @@ namespace OpenJpeg
 
             while (current_marker != J2K_Marker.SOT)
             {
+                // Check if the current marker ID is valid
                 if (current_marker < J2K_Marker.FIRST)
                 {
                     _cinfo.Error("We expected to read a marker ID (0xff--) instead of 0x{0:X}", current_marker);
@@ -4742,7 +4839,7 @@ namespace OpenJpeg
                     return false;
                 }
 
-                int marker_size = _cio.ReadUShort();
+                uint marker_size = _cio.ReadUShort();
                 if (marker_size < 2)
                 {
                     _cinfo.Error("Invalid marker size");
@@ -4754,7 +4851,7 @@ namespace OpenJpeg
                 if (marker_size > _specific_param.decoder.header_data_size)
                 {
                     _specific_param.decoder.header_data = new byte[marker_size];
-                    _specific_param.decoder.header_data_size = marker_size;
+                    _specific_param.decoder.header_data_size = (int)marker_size;
                 }
 
                 if (!e.Handler(marker_size))
@@ -4792,6 +4889,8 @@ namespace OpenJpeg
 
             // Position of the last element if the main header
             _cstr_index.main_head_end = _cio.Pos - 2;
+
+            BuildTPIndexFromTLM();
 
             // Next step: read a tile-part header
             _specific_param.decoder.state = J2K_STATUS.TPHSOT;
@@ -4846,18 +4945,15 @@ namespace OpenJpeg
             return true;
         }
 
-        //2.5 - opj_j2k_read_sot
-        internal bool ReadSOT(int header_size)
+        //2.5.3 - opj_j2k_read_sot
+        internal bool ReadSOT(OPJ_UINT32 header_size)
         {
-            if (header_size != 8)
-            {
-                _cinfo.Error("Error reading SOT marker");
+            uint tot_len, current_part, num_parts;
+
+            if (!GetSOTValues(header_size, out _current_tile_number, out tot_len, out current_part, out num_parts))
                 return false;
-            }
 
-            //Tile number
-            _current_tile_number = _cio.ReadUShort();
-
+            // testcase 2.pdf.SIGFPE.706.1112
             if (_current_tile_number >= _cp.tw * _cp.th)
             {
                 _cinfo.Error("Invalid tile number {0}", _current_tile_number);
@@ -4867,8 +4963,7 @@ namespace OpenJpeg
             var tcp = _cp.tcps[_current_tile_number];
             uint tile_x = _current_tile_number % _cp.tw;
             uint tile_y = _current_tile_number / _cp.tw;
-            uint tot_len = _cio.ReadUInt();
-            uint current_part = _cio.ReadByte();
+
 
             if (_specific_param.decoder.tile_ind_to_dec < 0 ||
                 _current_tile_number == (OPJ_UINT32)
@@ -4897,6 +4992,10 @@ namespace OpenJpeg
 
             tcp.current_tile_part_number = (int) current_part;
 
+            // look for the tile in the list of already processed tile (in parts).
+            // Optimization possible here with a more complex data structure and with the removing of tiles
+            // since the time taken by this function can only grow at the time
+
             if (tot_len != 0 && tot_len < 14)
             {
                 if (tot_len == 12) //Special case for the PHR data which are read by kakadu
@@ -4918,25 +5017,27 @@ namespace OpenJpeg
 
             if (tcp.n_tile_parts != 0 && current_part >= tcp.n_tile_parts)
             {
+                // Fixes https://bugs.chromium.org/p/oss-fuzz/issues/detail?id=2851
                 _cinfo.Error("In SOT marker, TPSot ({0}) is not valid regards to the current " +
-                             "number of tile-part ({1}), giving up\n", current_part, tcp.n_tile_parts);
+                             "number of tile-part ({1}), giving up", current_part, tcp.n_tile_parts);
                 _specific_param.decoder.last_tile_part = true;
                 return false;
             }
 
-            uint num_parts = _cio.ReadByte();
 
             if (num_parts != 0)
             {
                 //Number of tile-part header is provided by this tile-part header
                 num_parts += _specific_param.decoder.n_tile_parts_correction ? 1u : 0u;
+                // Useful to manage the case of textGBR.jp2 file because two values of TNSot are allowed: the correct numbers of
+                // tile-parts for that tile and zero (A.4.2 of 15444-1 : 2002).
 
                 if (tcp.n_tile_parts != 0)
                 {
                     if (current_part >= tcp.n_tile_parts)
                     {
                         _cinfo.Error("In SOT marker, TPSot ({0}) is not valid regards to the current " +
-                                     "number of tile-part ({1}), giving up\n", current_part, tcp.n_tile_parts);
+                                     "number of tile-part ({1}), giving up", current_part, tcp.n_tile_parts);
                         _specific_param.decoder.last_tile_part = true;
                         return false;
                     }
@@ -4944,6 +5045,7 @@ namespace OpenJpeg
 
                 if (current_part >= num_parts)
                 {
+                    // testcase 451.pdf.SIGSEGV.ce9.3723
                     _cinfo.Error("In SOT marker, TPSot ({0}) is not valid regards to the current " +
                         "number of tile-part (header) ({0}), giving up", current_part, num_parts);
                     _specific_param.decoder.last_tile_part = true;
@@ -4988,12 +5090,24 @@ namespace OpenJpeg
                 _specific_param.decoder.skip_data = _current_tile_number != _specific_param.decoder.tile_ind_to_dec;
             }
 
-            if (_cstr_index != null)
+            Debug.Assert(_cstr_index != null && _cstr_index.tile_index != null);
             {
                 _cstr_index.tile_index[_current_tile_number].tileno = _current_tile_number;
                 _cstr_index.tile_index[_current_tile_number].current_tpsno = current_part;
 
-                if (num_parts != 0)
+                if (!_specific_param.decoder.tlm.is_invalid &&
+                    num_parts > _cstr_index.tile_index[_current_tile_number].n_tps)
+                {
+                    _cinfo.Warn("SOT marker for tile {0} declares more tile-parts than found in TLM marker.",
+                        _current_tile_number);
+                    _specific_param.decoder.tlm.is_invalid = true;
+                }
+                
+                if (!_specific_param.decoder.tlm.is_invalid)
+                {
+                    // Do nothing
+                }
+                else if (num_parts != 0)
                 {
                     _cstr_index.tile_index[_current_tile_number].n_tps = num_parts;
                     _cstr_index.tile_index[_current_tile_number].current_n_tps = num_parts;
@@ -5028,7 +5142,7 @@ namespace OpenJpeg
             return true;
         }
 
-        //2.5 - opj_j2k_read_sod
+        //2.5.3 - opj_j2k_read_sod
         internal bool ReadSOD()
         {
             TileCodingParams tcp = _cp.tcps[_current_tile_number];
@@ -5102,7 +5216,7 @@ namespace OpenJpeg
             }
 
             // Index
-            if (_cstr_index != null)
+            Debug.Assert(_cstr_index != null);
             {
                 long current_pos = _cio.Pos - 2;
 
@@ -5139,29 +5253,116 @@ namespace OpenJpeg
         /// <summary>
         /// Reads a TLM marker (Tile Length Marker)
         /// </summary>
-        /// <remarks>2.5 - opj_j2k_read_tlm</remarks>
-        internal bool ReadTLM(int header_size)
+        /// <param name="header_size">
+        /// the size of the data contained in the TLM marker.
+        /// </param>
+        /// <remarks>
+        /// 2.5.3 - opj_j2k_read_tlm
+        /// 
+        /// In the original impl. all the data is read before this
+        /// function is called. Here, it's read piecewise from the
+        /// cio stream.
+        /// </remarks>
+        internal bool ReadTLM(uint header_size)
         {
+            TlmInfo tlm = _specific_param.decoder.tlm;
+            if (tlm == null)
+            {
+                tlm = new TlmInfo();
+                _specific_param.decoder.tlm = tlm;
+            }
+
             if (header_size < 2)
             {
-                _cinfo.Error("Error reading TLM marker");
+                _cinfo.Error("Error reading TLM marker.");
                 return false;
             }
-            header_size -= 2;
+
+            if (tlm.is_invalid)
+            {
+                _cio.Skip(header_size);
+                return true;
+            }
 
             uint Ztlm = _cio.ReadByte();
             uint Stlm = _cio.ReadByte();
+            header_size -= 2;
+
             uint ST = ((Stlm >> 4) & 0x03);
+            if (ST == 3)
+            {
+                tlm.is_invalid = true;
+                _cinfo.Warn("opj_j2k_read_tlm(): ST = 3 is invalid.");
+                _cio.Skip(header_size);
+                return true;
+            }
             uint SP = (Stlm >> 6) & 0x01;
 
             uint Ptlm_size = (SP + 1) * 2;
-            uint quotient = Ptlm_size + ST;
+            uint entry_size = Ptlm_size + ST;
 
-            if (header_size % quotient != 0)
+            if (header_size % entry_size != 0)
             {
-                _cinfo.Error("Error reading TLM marker");
-                return false;
+                tlm.is_invalid = true;
+                _cinfo.Warn("opj_j2k_read_tlm(): TLM marker not of expected size.");
+                _cio.Skip(header_size);
+                return true;
             }
+
+            var num_tileparts = header_size / entry_size;
+            if (num_tileparts == 0)
+            {
+                // not totally sure if this is valid...
+                _cio.Skip(header_size);
+                return true;
+            }
+
+            // Highly unlikely, unless there are gazillions of TLM markers
+            if (tlm.entries_count > uint.MaxValue - num_tileparts ||
+                tlm.entries_count + num_tileparts > uint.MaxValue / 8)
+            {
+                tlm.is_invalid = true;
+                _cinfo.Warn("opj_j2k_read_tlm(): too many TLM markers.");
+                _cio.Skip(header_size);
+                return true;
+            }
+
+            // C#: In the org impl, if there's not enough memory, it will skip reading TLMs
+            //     Here we will crash.
+            //     Also note, this is a struct.
+            tlm.tile_part_infos = new TlmTilePartInfo[tlm.entries_count + num_tileparts];
+
+
+            for (int i=0; i < num_tileparts; i++)
+            {
+                uint tile_index;
+
+                // Read Ttlm_i
+                if (ST == 0)
+                    tile_index = tlm.entries_count;
+                else
+                {
+                    tile_index = _cio.Read(ST);
+                    header_size -= ST;
+                }
+                
+                if (tile_index >= _cp.tw * _cp.th)
+                {
+                    tlm.is_invalid = true;
+                    _cinfo.Warn("opj_j2k_read_tlm(): invalid tile number {0}", tile_index);
+                    _cio.Skip(header_size);
+                    return true;
+                }
+
+                uint length = _cio.Read(Ptlm_size);
+                header_size -= Ptlm_size;
+
+                tlm.tile_part_infos[tlm.entries_count].tile_index =
+                    (ushort)tile_index;
+                tlm.tile_part_infos[tlm.entries_count].length = length;
+                tlm.entries_count++;
+            }
+
             _cio.Skip(header_size);
             return true;
         }
@@ -5170,7 +5371,7 @@ namespace OpenJpeg
         /// Reads a PLM marker (Packet length, main header marker)
         /// </summary>
         /// <remarks>2.5 - opj_j2k_read_plm</remarks>
-        internal bool ReadPLM(int header_size)
+        internal bool ReadPLM(uint header_size)
         {
             if (header_size < 1)
             {
@@ -5219,7 +5420,7 @@ namespace OpenJpeg
         /// Reads a PLT marker (Packet length, tile-part header)
         /// </summary>
         /// <remarks>2.5 - opj_j2k_read_plt</remarks>
-        internal bool ReadPLT(int header_size)
+        internal bool ReadPLT(uint header_size)
         {
             if (header_size < 1)
             {
@@ -5258,7 +5459,7 @@ namespace OpenJpeg
         /// Uppgrading to 2.5 isn't trivial, so we added an error check 
         /// (_cp.ppm_data == null) and called it a day.
         /// </remarks>
-        internal bool ReadPPM(int header_size)
+        internal bool ReadPPM(uint header_size)
         {
             // We need to have the Z_ppm element + 1 byte of Nppm/Ippm at minimum
             if (header_size < 2)
@@ -5296,7 +5497,7 @@ namespace OpenJpeg
 
             _cp.ppm_markers[Z_ppm].Data = new byte[header_size];
             //_cp.ppm_markers[Z_ppm].DataSize = header_size;
-            _cio.Read(_cp.ppm_markers[Z_ppm].Data, 0, header_size);
+            _cio.Read(_cp.ppm_markers[Z_ppm].Data, 0, (int)header_size);
 
             return true;
         }
@@ -5326,11 +5527,11 @@ namespace OpenJpeg
                     if (N_ppm_remaining >= data.BytesLeft)
                     {
                         N_ppm_remaining -= (uint) data.BytesLeft;
-                        data.Skip((int)data.BytesLeft);
+                        data.Skip((uint)data.BytesLeft);
                     }
                     else
                     {
-                        data.Skip((int) N_ppm_remaining);
+                        data.Skip(N_ppm_remaining);
                         N_ppm_remaining = 0U;
                     }
 
@@ -5355,12 +5556,12 @@ namespace OpenJpeg
                             ppm_data_size += N_ppm;
                             if (data.BytesLeft >= N_ppm)
                             {
-                                data.Skip((int) N_ppm);
+                                data.Skip(N_ppm);
                             }
                             else
                             {
                                 N_ppm_remaining = N_ppm - (uint) data.BytesLeft;
-                                data.Skip((int) data.BytesLeft);
+                                data.Skip((uint) data.BytesLeft);
                             }
                         } while (data.BytesLeft > 0);
                     }
@@ -5454,7 +5655,7 @@ namespace OpenJpeg
         /// <remarks>
         /// 2.5 - opj_j2k_read_ppt
         /// </remarks>
-        internal bool ReadPPT(int header_size)
+        internal bool ReadPPT(uint header_size)
         {
             //We need to have the Z_ppt element at minimum
             if (header_size < 1)
@@ -5499,7 +5700,7 @@ namespace OpenJpeg
             tcp.ppt_markers[Z_ppt].Data = new byte[header_size];
 
             //Read packet header
-            _cio.Read(tcp.ppt_markers[Z_ppt].Data, 0, header_size);
+            _cio.Read(tcp.ppt_markers[Z_ppt].Data, 0, (int)header_size);
 
             return true;
         }
@@ -5509,9 +5710,9 @@ namespace OpenJpeg
         /// </summary>
         /// <param name="header_size">The size of the data contained in the SIZ marker</param>
         /// <remarks>
-        /// 2.5.1 - opj_j2k_read_siz
+        /// 2.5.3 - opj_j2k_read_siz
         /// </remarks>
-        internal bool ReadSIZ(int header_size)
+        internal bool ReadSIZ(uint header_size)
         {
             // minimum size == 39 - 3 (= minimum component parameter)
             if (header_size < 36)
@@ -5520,7 +5721,7 @@ namespace OpenJpeg
                 return false;
             }
 
-            int remaining_size = header_size - 36;
+            uint remaining_size = header_size - 36;
             uint n_comps = (uint)remaining_size / 3u;
             if (remaining_size % 3 != 0)
             {
@@ -5713,6 +5914,9 @@ namespace OpenJpeg
                 _cp.tcps[c] = tcp;
             }
 
+            //Allocate and initialize some elements of codestrem index
+            AllocateTileElementCstrIndex();
+
             _specific_param.decoder.state = J2K_STATUS.MH;
             _private_image.CompHeaderUpdate(_cp);
 
@@ -5727,7 +5931,7 @@ namespace OpenJpeg
         /// <remarks>
         /// 2.5 - opj_j2k_read_cod
         /// </remarks>
-        internal bool ReadCOD(int header_size)
+        internal bool ReadCOD(uint header_size)
         {
             var tcp = _specific_param.decoder.state == J2K_STATUS.TPH ? 
                 _cp.tcps[_current_tile_number] : _specific_param.decoder.default_tcp;
@@ -5813,7 +6017,7 @@ namespace OpenJpeg
         }
 
         //2.5 - opj_j2k_read_SPCod_SPCoc
-        internal bool ReadSPCod_SPCoc(int compno, ref int header_size)
+        internal bool ReadSPCod_SPCoc(int compno, ref uint header_size)
         {
             var tcp = _specific_param.decoder.state == J2K_STATUS.TPH ? _cp.tcps[_current_tile_number] : _specific_param.decoder.default_tcp;
             var tccp = tcp.tccps[compno];
@@ -5889,7 +6093,7 @@ namespace OpenJpeg
                     tccp.prch[i] = tmp >> 4;
                 }
 
-                header_size -= (int) tccp.numresolutions;
+                header_size -= tccp.numresolutions;
             }
             else
             {
@@ -5905,7 +6109,7 @@ namespace OpenJpeg
         }
 
         //2.5 - opj_j2k_read_SQcd_SQcc
-        internal bool ReadSQcd_SQcc(int compno, ref int header_size)
+        internal bool ReadSQcd_SQcc(int compno, ref uint header_size)
         {
             var tcp = _specific_param.decoder.state == J2K_STATUS.TPH ? _cp.tcps[_current_tile_number] : _specific_param.decoder.default_tcp;
             var tccp = tcp.tccps[compno];
@@ -5920,7 +6124,7 @@ namespace OpenJpeg
             uint tmp = _cio.ReadByte();
             tccp.qntsty = (CCP_QNTSTY) (tmp & 0x1f);
             tccp.numgbits = tmp >> 5;
-            int num_bands;
+            uint num_bands;
             if (tccp.qntsty == CCP_QNTSTY.SIQNT)
                 num_bands = 1;
             else
@@ -6004,12 +6208,12 @@ namespace OpenJpeg
         /// </summary>
         /// <param name="header_size">The size of the data contained in the COC marker</param>
         /// <remarks>2.5 - opj_j2k_read_coc</remarks>
-        internal bool ReadCOC(int header_size)
+        internal bool ReadCOC(uint header_size)
         {
             var tcp = _specific_param.decoder.state == J2K_STATUS.TPH ? _cp.tcps[_current_tile_number] : 
                 _specific_param.decoder.default_tcp;
 
-            int comp_room = _private_image.numcomps <= 256 ? 1 : 2;
+            uint comp_room = _private_image.numcomps <= 256 ? 1u : 2;
             if (header_size < comp_room + 1)
             {
                 _cinfo.Error("Error reading COC marker");
@@ -6037,7 +6241,7 @@ namespace OpenJpeg
         /// <summary>
         /// Reads a CRG marker (Component registration)
         /// </summary>
-        internal bool ReadCRG(int header_size)
+        internal bool ReadCRG(uint header_size)
         {
             uint numcomps = _private_image.numcomps;
             if (header_size != numcomps * 4)
@@ -6054,7 +6258,7 @@ namespace OpenJpeg
         /// Reads a COM marker (comments)
         /// </summary>
         //2.5
-        internal bool ReadCOM(int header_size)
+        internal bool ReadCOM(uint header_size)
         {
             _cio.Skip(header_size);
             return true;
@@ -6064,7 +6268,7 @@ namespace OpenJpeg
         /// Reads a CBD marker (Component bit depth definition)
         /// </summary>
         //2.1
-        internal bool ReadCBD(int header_size)
+        internal bool ReadCBD(uint header_size)
         {
             OPJ_UINT32 n_comps, num_comps;
 
@@ -6102,7 +6306,7 @@ namespace OpenJpeg
         /// <remarks>
         /// 2.5
         /// </remarks>
-        internal bool ReadCAP(int header_size)
+        internal bool ReadCAP(uint header_size)
         {
             _cio.Skip(header_size);
 
@@ -6113,7 +6317,7 @@ namespace OpenJpeg
         /// Reads a MCO marker (Multiple Component Transform Ordering)
         /// </summary>
         //2.1
-        internal bool ReadMCO(int p_header_size)
+        internal bool ReadMCO(uint p_header_size)
         {
             OPJ_UINT32 l_tmp, i;
             OPJ_UINT32 l_nb_stages;
@@ -6244,7 +6448,7 @@ namespace OpenJpeg
         /// Reads a MCC marker (Multiple Component Collection)
         /// </summary>
         /// <remarks>2.5 - opj_j2k_read_mcc</remarks>
-        internal bool ReadMCC(int header_size)
+        internal bool ReadMCC(uint header_size)
         {
             OPJ_UINT32 i, j;
             OPJ_UINT32 tmp;
@@ -6362,7 +6566,7 @@ namespace OpenJpeg
                     return false;
                 }
 
-                header_size -= (int) (n_bytes_by_comp * mcc_record.n_comps + 2);
+                header_size -= n_bytes_by_comp * mcc_record.n_comps + 2;
 
                 for (j = 0; j < mcc_record.n_comps; ++j)
                 {
@@ -6371,7 +6575,7 @@ namespace OpenJpeg
                     if (tmp != j)
                     {
                         _cinfo.Warn("Cannot take in charge collections with indix shuffle");
-                        _cio.Skip((int)(header_size + mcc_record.n_comps - j));
+                        _cio.Skip(header_size + mcc_record.n_comps - j);
                         return true;
                     }
                 }
@@ -6394,7 +6598,7 @@ namespace OpenJpeg
                     return false;
                 }
 
-                header_size -= (int)(n_bytes_by_comp * mcc_record.n_comps + 3);
+                header_size -= n_bytes_by_comp * mcc_record.n_comps + 3;
 
                 for (j = 0; j < mcc_record.n_comps; ++j)
                 {
@@ -6403,7 +6607,7 @@ namespace OpenJpeg
                     if (tmp != j)
                     {
                         _cinfo.Warn("Cannot take in charge collections with indix shuffle");
-                        _cio.Skip((int)(header_size + (mcc_record.n_comps - j) * n_bytes_by_comp));
+                        _cio.Skip(header_size + (mcc_record.n_comps - j) * n_bytes_by_comp);
                         return true;
                     }
                 }
@@ -6471,7 +6675,7 @@ namespace OpenJpeg
         /// Reads a MCT marker (Multiple Component Transform)
         /// </summary>
         /// <remarks>2.5 - opj_j2k_read_mct</remarks>
-        internal bool ReadMCT(int header_size)
+        internal bool ReadMCT(uint header_size)
         {
             OPJ_UINT32 i;
             TileCodingParams tcp;
@@ -6556,10 +6760,10 @@ namespace OpenJpeg
             header_size -= 6;
 
             mct_data.data = new ShortOrIntOrFloatOrDoubleAr(mct_data.element_type,
-                ShortOrIntOrFloatOrDoubleAr.SizeDiv(mct_data.element_type, header_size));
-            mct_data.data_size = header_size;
+                ShortOrIntOrFloatOrDoubleAr.SizeDiv(mct_data.element_type, (int)header_size));
+            mct_data.data_size = (int)header_size;
             byte[] tmp_buffer = new byte[header_size];
-            _cio.Read(tmp_buffer, 0, header_size);
+            _cio.Read(tmp_buffer, 0, (int)header_size);
             mct_data.data.SetBytes(tmp_buffer);
 
             return true;
@@ -6611,7 +6815,7 @@ namespace OpenJpeg
         ///  Reads a RGN marker (Region Of Interest)
         /// </summary>
         /// <remarks>2.5 - opj_j2k_read_rgn</remarks>
-        internal bool ReadRGN(int header_size)
+        internal bool ReadRGN(uint header_size)
         {
             int comp_room = (_private_image.numcomps <= 256) ? 1 : 2;
             if (header_size != 2 + comp_room)
@@ -6640,7 +6844,7 @@ namespace OpenJpeg
         /// <remarks>
         /// 2.5 - opj_j2k_read_qcd
         /// </remarks>
-        internal bool ReadQCD(int header_size)
+        internal bool ReadQCD(uint header_size)
         {
             if (!ReadSQcd_SQcc(0, ref header_size))
             {
@@ -6695,7 +6899,7 @@ namespace OpenJpeg
         /// <param name="header_size">The size of the data contained in the QCC marker.</param>
         /// <returns>False on failure</returns>
         /// <remarks>2.5 - opj_j2k_read_qcc</remarks>
-        internal bool ReadQCC(int header_size)
+        internal bool ReadQCC(uint header_size)
         {
             uint num_comp = _private_image.numcomps;
             int compno;
@@ -6840,7 +7044,7 @@ namespace OpenJpeg
         /// Reads a POC marker (Progression Order Change)
         /// </summary>
         /// <remarks>2.5 - opj_j2k_read_poc</remarks>
-        internal bool ReadPOC(int header_size)
+        internal bool ReadPOC(uint header_size)
         {
             uint numcomps = _private_image.numcomps;
 
@@ -7488,6 +7692,48 @@ namespace OpenJpeg
             internal uint nb_comps;
         }
 
+        /// <summary>
+        /// Entry of a TLM marker segment
+        /// </summary> 
+        /// <remarks>
+        /// 2.5.3 - opj_j2k_tlm_tile_part_info
+        /// </remarks>
+        struct TlmTilePartInfo
+        {
+            /// <summary>
+            /// Tile index of the tile part. Ttlmi field
+            /// </summary>
+            public ushort tile_index;
+
+            /// <summary>
+            /// Length in bytes, from the beginning of the SOT marker to the end of
+            /// the bit stream data for that tile-part. Ptlmi field
+            /// </summary>
+            public uint length;
+        }
+
+        /// <summary>
+        /// Information got from the concatenation of TLM marker semgnets.
+        /// </summary>
+        /// <remarks>
+        /// 2.5.3 - opj_j2k_tlm_info 
+        /// </remarks>
+        class TlmInfo
+        {
+            /// <summary>
+            /// Number of entries in m_tile_part_infos.
+            /// </summary>
+            public uint entries_count;
+
+            /// <summary>
+            /// Array of m_entries_count values.
+            /// </summary>
+            public TlmTilePartInfo[] tile_part_infos;
+
+            public bool is_invalid;
+        }
+
+        //2.5.3 - opj_j2k_dec 
         struct DecParams
         {
             /// <summary>
@@ -7543,6 +7789,8 @@ namespace OpenJpeg
             /// </remarks>
             internal int numcomps_to_decode;
             internal int[] comps_indices_to_decode;
+
+            internal TlmInfo tlm;
 
             uint bitvector1;
 

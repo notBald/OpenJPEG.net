@@ -117,5 +117,5 @@ namespace OpenJpeg.Internal
         { Mark = mark; States = states; Handler = handler; }
     }
 
-    delegate bool J2K_Action(int header_size);
+    delegate bool J2K_Action(uint header_size);
 }

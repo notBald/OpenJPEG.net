@@ -132,7 +132,7 @@ namespace OpenJpeg
 
         #endregion
 
-        internal void Skip(int n)
+        internal void Skip(uint n)
         {
             _s.Seek(n, SeekOrigin.Current);
         }
