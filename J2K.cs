@@ -3644,7 +3644,7 @@ namespace OpenJpeg
             }
         }
 
-        //2.5
+        //2.5 - opj_j2k_are_all_used_components_decoded
         private bool AreAllUsedComponentsDecoded()
         {
             OPJ_UINT32 compno;
@@ -3685,6 +3685,27 @@ namespace OpenJpeg
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// C#. Org impl uses quicksort. 
+        /// </summary>
+        private void BubbleSort(long[] arr)
+        {
+            int n = arr.Length;
+            for (int i = 0; i < n - 1; i++)
+            {
+                for (int j = 0; j < n - i - 1; j++)
+                {
+                    if (arr[j] > arr[j + 1])
+                    {
+                        // Swap arr[j] and arr[j + 1]
+                        long temp = arr[j];
+                        arr[j] = arr[j + 1];
+                        arr[j + 1] = temp;
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -3781,7 +3802,7 @@ namespace OpenJpeg
             return AreAllUsedComponentsDecoded();
         }
 
-        //2.5 - opj_j2k_decode_tiles
+        //2.5.3 - opj_j2k_decode_tiles
         bool DecodeTiles()
         {
             bool go_on = true;
@@ -3790,6 +3811,7 @@ namespace OpenJpeg
             int tile_x0, tile_y0, tile_x1, tile_y1;
             uint n_comps;
             uint nr_tiles = 0;
+            long end_pos = 0;
 
             // Particular case for whole single tile decoding
             // We can avoid allocating intermediate tile buffers
@@ -3830,9 +3852,68 @@ namespace OpenJpeg
                 return true;
             }
 
-            //int max_data_size = 1024;
-            //byte[] current_data = new byte[max_data_size];
-            //int[][] current_data = new int[_image.numcomps][];
+            _specific_param.decoder.num_intersecting_tile_parts = 0;
+            _specific_param.decoder.idx_intersecting_tile_parts = 0;
+            _specific_param.decoder.intersecting_tile_parts_offset = null;
+
+            // If the area to decode only intersects a subset of tiles, and we have
+            // valid TLM information, then use it to plan the tilepart offsets to
+            // seek to.
+            if (!(_specific_param.decoder.start_tile_x == 0 &&
+                  _specific_param.decoder.start_tile_y == 0 &&
+                  _specific_param.decoder.end_tile_x == _cp.tw &&
+                  _specific_param.decoder.end_tile_y == _cp.th) &&
+                 !_specific_param.decoder.tlm.is_invalid &&
+                 _cio.CanSeek)
+            {
+                OPJ_UINT32 m_num_intersecting_tile_parts = 0;
+
+                OPJ_UINT32 j;
+                for (j = 0; j < _cp.tw * _cp.th; ++j)
+                {
+                    if (_cstr_index.tile_index[j].n_tps > 0 &&
+                        _cstr_index.tile_index[j].tp_index[_cstr_index.tile_index[j].n_tps - 1].end_pos > end_pos)
+                    {
+                        end_pos = _cstr_index.tile_index[j].tp_index[_cstr_index.tile_index[j].n_tps - 1].end_pos;
+                    }
+                }
+
+                for (j = _specific_param.decoder.start_tile_y; j < _specific_param.decoder.end_tile_y; ++j)
+                {
+                    OPJ_UINT32 i;
+                    for (i = _specific_param.decoder.start_tile_x; i < _specific_param.decoder.end_tile_x; ++i)
+                    {
+                        OPJ_UINT32 tile_number = j * _cp.tw + i;
+                        m_num_intersecting_tile_parts += _cstr_index.tile_index[tile_number].n_tps;
+                    }
+                }
+
+                _specific_param.decoder.intersecting_tile_parts_offset = new long[m_num_intersecting_tile_parts];
+                if (m_num_intersecting_tile_parts > 0)
+                {
+                    OPJ_UINT32 idx = 0;
+                    for (j = _specific_param.decoder.start_tile_y; j < _specific_param.decoder.end_tile_y; ++j)
+                    {
+                        OPJ_UINT32 i;
+                        for (i = _specific_param.decoder.start_tile_x; i < _specific_param.decoder.end_tile_x; ++i)
+                        {
+                            OPJ_UINT32 tile_number = j * _cp.tw + i;
+                            OPJ_UINT32 k;
+                            for (k = 0; k < _cstr_index.tile_index[tile_number].n_tps; ++k)
+                            {
+                                var next_tp_sot_pos = _cstr_index.tile_index[tile_number].tp_index[k].start_pos;
+                                _specific_param.decoder.intersecting_tile_parts_offset[idx] = next_tp_sot_pos;
+                                ++idx;
+                            }
+                        }
+                    }
+
+                    _specific_param.decoder.num_intersecting_tile_parts = idx;
+
+                    // Sort by increasing offset
+                    BubbleSort(_specific_param.decoder.intersecting_tile_parts_offset);
+                }
+            }
 
             while (true)
             {
@@ -3855,11 +3936,6 @@ namespace OpenJpeg
                     if (!go_on)
                         break;
                 }
-
-                //if (current_tile_no == 0)
-                //{
-                //    current_tile_no = current_tile_no;
-                //}
 
                 if (!DecodeTile(current_tile_no, null))
                 {
@@ -3894,6 +3970,13 @@ namespace OpenJpeg
 
                 if (++nr_tiles == _cp.th * _cp.tw)
                     break;
+
+                if (_specific_param.decoder.num_intersecting_tile_parts > 0 &&
+                    _specific_param.decoder.idx_intersecting_tile_parts == _specific_param.decoder.num_intersecting_tile_parts)
+                {
+                    _cio.Pos = end_pos + 2;
+                    break;
+                }
             }
 
             return AreAllUsedComponentsDecoded();
@@ -4317,6 +4400,23 @@ namespace OpenJpeg
             //Read into the codestream until reach the EOC
             while (!_specific_param.decoder.can_decode && current_marker != J2K_Marker.EOC)
             {
+                if (_specific_param.decoder.num_intersecting_tile_parts > 0 &&
+                    _specific_param.decoder.idx_intersecting_tile_parts <
+                    _specific_param.decoder.num_intersecting_tile_parts)
+                {
+                    var next_tp_sot_pos = _specific_param.decoder.intersecting_tile_parts_offset[_specific_param.decoder.idx_intersecting_tile_parts];
+                    ++_specific_param.decoder.idx_intersecting_tile_parts;
+                    _cio.Pos = next_tp_sot_pos;
+
+                    current_marker = (J2K_Marker)_cio.ReadUShort();
+                    
+                    if (current_marker != J2K_Marker.SOT)
+                    {
+                        _cinfo.Error("Did not get expected SOT marker");
+                        return false;
+                    }
+                }
+
                 //Try to read until the Start Of Data is detected
                 while (current_marker != J2K_Marker.SOD)
                 {
@@ -7791,6 +7891,22 @@ namespace OpenJpeg
             internal int[] comps_indices_to_decode;
 
             internal TlmInfo tlm;
+
+            // Below if used when there's TLM information available and we use
+            // opj_set_decoded_area() to a subset of all tiles.
+
+            /// <summary>
+            /// Current index in m_intersecting_tile_parts_offset[] to seek to
+            /// </summary>
+            internal OPJ_UINT32 idx_intersecting_tile_parts;
+            /// <summary>
+            /// Number of elements of m_intersecting_tile_parts_offset[]
+            /// </summary>
+            internal OPJ_UINT32 num_intersecting_tile_parts;
+            /// <summary>
+            /// Start offset of contributing tile parts
+            /// </summary>
+            internal long[] intersecting_tile_parts_offset;
 
             uint bitvector1;
 
