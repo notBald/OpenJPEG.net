@@ -32,6 +32,7 @@
  */
 #endregion
 #region Using
+using System;
 using OPJ_UINT32 = System.Int32;
 #endregion
 
@@ -124,10 +125,18 @@ namespace OpenJpeg
 
         internal DPARAMETERS flags;
 
+        [Flags()]
         public enum DPARAMETERS
         {
+            //OPJ_DPARAMETERS_IGNORE_PCLR_CMAP_CDEF_FLAG  
             IGNORE_PCLR_CMAP_CDEF_FLAG = 1,
-            DUMP_FLAG = 2
+            /// <summary>
+            /// Has to be compiled with SUPPORT_DUMP_FLAG to take effect
+            /// </summary>
+            /// <remarks>OPJ_DPARAMETERS_DUMP_FLAG</remarks>
+            DUMP_FLAG = 2,
+            //OPJ_DPARAMETERS_DISABLE_TPSOT_FIX           
+            DISABLE_TPSOT_FIX = 4
         }
     }
 }

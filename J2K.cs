@@ -199,11 +199,11 @@ namespace OpenJpeg
             return j2k;
         }
 
-#endregion
+        #endregion
 
-#region Setup
+        #region Setup
 
-        //2.5
+        //2.5 - opj_j2k_setup_decoder
         internal void SetupDecode(CIO cio, DecompressionParameters parameters)
         {
             _cio = cio;
@@ -215,6 +215,8 @@ namespace OpenJpeg
 #if SUPPORT_DUMP_FLAG
                 _dump_state = (parameters.flags & DecompressionParameters.DPARAMETERS.DUMP_FLAG) != 0;
 #endif
+                if ((parameters.flags & DecompressionParameters.DPARAMETERS.DISABLE_TPSOT_FIX) != 0)
+                    _specific_param.decoder.n_tile_parts_correction_checked = true;
             }
         }
 
@@ -4563,10 +4565,22 @@ namespace OpenJpeg
                         !_specific_param.decoder.n_tile_parts_correction_checked)
                     {
                         // Issue 254
-                        bool correction_needed;
+                        bool correction_needed = false;
 
                         _specific_param.decoder.n_tile_parts_correction_checked = true;
-                        if (!NeedNTilePartsCorrection(_current_tile_number, out correction_needed))
+                        if (_cp.tcps[_current_tile_number].n_tile_parts == 1)
+                        {
+                            /* Skip opj_j2k_need_nb_tile_parts_correction() if there is
+                             * only a single tile part declared. The
+                             * opj_j2k_need_nb_tile_parts_correction() hack was needed
+                             * for files with 5 declared tileparts (where they were
+                             * actually 6).
+                             * Doing it systematically hurts performance when reading
+                             * Sentinel2 L1C JPEG2000 files as explained in
+                             * https://lists.osgeo.org/pipermail/gdal-dev/2024-November/059805.html
+                             */
+                        }
+                        else if (!NeedNTilePartsCorrection(_current_tile_number, out correction_needed))
                         {
                             _cinfo.Error("opj_j2k_apply_nb_tile_parts_correction error");
                             return false;
