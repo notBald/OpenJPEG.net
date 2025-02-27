@@ -4454,7 +4454,8 @@ namespace OpenJpeg
                         break;
                     }
 
-                    if ((_specific_param.decoder.state & J2K_STATUS.TPH) != 0)
+                    if (((_specific_param.decoder.state & J2K_STATUS.TPH) != 0) &&
+                          _specific_param.decoder.sot_length != 0)
                     {
                         if (_specific_param.decoder.sot_length < marker_size + 2)
                         {
