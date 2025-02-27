@@ -774,7 +774,16 @@ namespace OpenJpeg
                     tccp.qmfbid = parameters.irreversible ? 0U : 1U;
                     tccp.qntsty = parameters.irreversible ? CCP_QNTSTY.SEQNT : 
                                   CCP_QNTSTY.NOQNT;
-                    tccp.numgbits = 2;
+
+                    if (parameters.IsCinema && parameters.rsiz == J2K_PROFILE.CINEMA_2K)
+                    {
+                        // From https://github.com/uclouvain/openjpeg/issues/1340
+                        tccp.numgbits = 1;
+                    }
+                    else
+                    {
+                        tccp.numgbits = 2;
+                    }
 
                     if (i == parameters.roi_compno)
                         tccp.roishift = parameters.roi_shift;
