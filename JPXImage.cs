@@ -532,7 +532,7 @@ namespace OpenJpeg
         /// </summary>
         /// <param name="cinfo">Optional cinfo</param>
         /// <returns>If it was able to do the conversion</returns>
-        public bool CMYKtoRGB(CompressionInfo cinfo)
+        public bool CMYKtoRGB(CompressionInfo cinfo = null)
         {
             if (ColorSpace != COLOR_SPACE.CMYK)
             {

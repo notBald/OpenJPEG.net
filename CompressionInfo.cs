@@ -45,7 +45,7 @@ namespace OpenJpeg
         /// <summary>
         /// Version number of this libary
         /// </summary>
-        public static string Version { get { return "2.5.2"; } }
+        public static string Version { get { return "2.5.3"; } }
 
         /// <summary>
         /// Whenever this object is a decompressor or
