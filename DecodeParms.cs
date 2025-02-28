@@ -134,9 +134,7 @@ namespace OpenJpeg
             /// Has to be compiled with SUPPORT_DUMP_FLAG to take effect
             /// </summary>
             /// <remarks>OPJ_DPARAMETERS_DUMP_FLAG</remarks>
-            DUMP_FLAG = 2,
-            //OPJ_DPARAMETERS_DISABLE_TPSOT_FIX           
-            DISABLE_TPSOT_FIX = 4
+            DUMP_FLAG = 2
         }
     }
 }

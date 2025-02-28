@@ -172,7 +172,7 @@ namespace OpenJpeg
             if (j2k._is_decompressor)
             {
                 //Default to using strict mode
-                j2k._cp.strict = true;
+                j2k.DecoderSetStrictMode(true);
 
                 j2k._cp.IsDecoder = true;
                 // in the absence of JP2 boxes, consider different bit depth / sign
@@ -203,7 +203,7 @@ namespace OpenJpeg
 
         #region Setup
 
-        //2.5 - opj_j2k_setup_decoder
+        //2.5.3 - opj_j2k_setup_decoder
         internal void SetupDecode(CIO cio, DecompressionParameters parameters)
         {
             _cio = cio;
@@ -215,9 +215,15 @@ namespace OpenJpeg
 #if SUPPORT_DUMP_FLAG
                 _dump_state = (parameters.flags & DecompressionParameters.DPARAMETERS.DUMP_FLAG) != 0;
 #endif
-                if ((parameters.flags & DecompressionParameters.DPARAMETERS.DISABLE_TPSOT_FIX) != 0)
-                    _specific_param.decoder.n_tile_parts_correction_checked = true;
             }
+        }
+
+        //2.5.3 - opj_j2k_decoder_set_strict_mode
+        internal void DecoderSetStrictMode(bool strict)
+        {
+            _cp.strict = strict;
+            if (strict)
+                _specific_param.decoder.n_tile_parts_correction_checked = true;
         }
 
         //2.5 - opj_j2k_encoder_set_extra_options
