@@ -3426,7 +3426,8 @@ namespace OpenJpeg
             {
                 OPJ_UINT32 current_tile_part = _cstr_index.tile_index[tileno].current_tpsno;
 
-                if (_cstr_index.tile_index[tileno].tp_index != null)
+                if (_cstr_index.tile_index[tileno].tp_index != null &&
+                    current_tile_part < _cstr_index.tile_index[tileno].n_tps)
                 {
                     _cstr_index.tile_index[tileno].tp_index[current_tile_part].start_pos = pos;
                 }
