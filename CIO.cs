@@ -32,14 +32,6 @@ namespace OpenJpeg
     /// Bits are written using the WBIO class. It buffers
     /// up to 256 bytes, and has to be manually flushed
     /// after use.
-    /// 
-    /// To fix the junk data issue one will have to
-    /// buffer a packet until it's compleatly written.
-    /// I belive the easiest way to accomplish that is
-    /// to add a start/stop buffering function to CIO.
-    /// 
-    /// A quick workaround is to write to a memory stream
-    /// and set LENGTH = POS as the final step.
     /// </remarks>
     public class CIO // Character In/Out
     {

@@ -4,7 +4,7 @@ This is a port of OpenJpeg to C#. This is a libary for encoding and decoding Jpe
 
 ## Usage
 
-recommend using PdfLib instead of using this library directly, as it's much easier to work with, but
+I recommend using PdfLib instead of using this library directly, as it's much easier to work with, but
 here is an incomplete example of how to decode Jpeg 2000:
 
 ```code
@@ -92,10 +92,10 @@ cp.NumberOfLayers = 2;
 //There are different strategies for compression.
 cp.DistroAlloc = true;
 
-//These numbers are the compression rates for each layer. Should be in decreasing order.
+//These numbers are the compression rates for each layer. Should be in decreasing order and must match number of layers.
 cp.Rates = new float[] { 60, 30 };
 
-//This libary uses the OpenJpeg 1.4 API, meaning cinfo instead of codec
+//This libary uses the OpenJpeg 1.4 API
 var cinfo = new CompressionInfo(false, CodecFormat.Jpeg2P);
 if (!cinfo.SetupEncoder(cp, image))
     throw new Exception("Failed to setup encoder");
@@ -103,7 +103,7 @@ if (!cinfo.SetupEncoder(cp, image))
 //We'll compress to a memory stream for this example.
 var dest = new MemoryStream();
 
-//Again, cio is from the OpenJpeg 1.4 API 
+//Cio is from the OpenJpeg 1.4 API. It's the wrapper used when reading from streams.
 var cio = cinfo.OpenCIO(dest, false);
 
 //Goes through the motions.
@@ -115,6 +115,4 @@ if (!cinfo.StartCompress(cio) || !cinfo.Encode() || !cinfo.EndCompress())
 
 ## About the port
 
-There is no usage of unsafe code. Despite this, performance is decent. 
-
-The preprocessor symbol "TEST_MATH_MODE" is for forcing the math to be done in a certain way, and is used for validating the libary.
+There is no usage of unsafe code.
