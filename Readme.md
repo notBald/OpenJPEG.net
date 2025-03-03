@@ -1,4 +1,4 @@
-﻿# OpenJpeg.Net
+﻿﻿# OpenJpeg.Net
 
 This is a port of OpenJpeg to C#. This is a libary for encoding and decoding Jpeg 2000 images.
 
@@ -7,8 +7,8 @@ This is a port of OpenJpeg to C#. This is a libary for encoding and decoding Jpe
 I recommend using PdfLib instead of using this library directly, as it's much easier to work with, but
 here is an incomplete example of how to decode Jpeg 2000:
 
-```code
-public override byte[] Decode(byte[] data, out int width, out int height, out int bpc)
+```c#
+public byte[] Decode(byte[] data, out int width, out int height, out int bpc)
 {
     //Detects the format
     CodecFormat format = data[0] == 0 ? CodecFormat.Jpeg2P : CodecFormat.Jpeg2K;
@@ -44,7 +44,7 @@ public override byte[] Decode(byte[] data, out int width, out int height, out in
     //to work with.
     img.MakeUniformBPC();
 
-    //Jpeg 2000m images can have a color palette, this removes
+    //Jpeg 2000 images can have a color palette, this removes
     //that.
     img.ApplyIndex();
 
@@ -76,7 +76,7 @@ public override byte[] Decode(byte[] data, out int width, out int height, out in
 ```
 
 Encoding:
-```code
+```c#
 var cp = new CompressionParameters();
 
 //Comments are optional
