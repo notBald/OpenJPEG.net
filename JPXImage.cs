@@ -427,9 +427,22 @@ namespace OpenJpeg
         /// <remarks>Should perhaps leave out the alpha channels</remarks>
         public byte[] ToArray()
         {
+            using (var ms = ToMemoryStream())
+            {
+                return ms.ToArray();
+            }
+        }
+
+        /// <summary>
+        /// Returns the raw image data as a stream of bytes. Note
+        /// that this method will rezise channels that don't fit.
+        /// </summary>
+        /// <remarks>Should perhaps leave out the alpha channels</remarks>
+        public MemoryStream ToMemoryStream()
+        {
             //Determine resolution.
             uint w = x1 - x0, h = y1 - y0;
-            
+
             //Resize channels if needed
             var cc = new int[comps.Length][];
             for (int c = 0; c < comps.Length; c++)
@@ -457,7 +470,7 @@ namespace OpenJpeg
                 bio.Flush();
             }
 
-            return ms.ToArray();
+            return ms;
         }
 
         /// <summary>
