@@ -35,10 +35,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using System.Threading;
-using static System.Net.Mime.MediaTypeNames;
 using OPJ_UINT32 = System.UInt32;
 #endregion
 

@@ -33,13 +33,10 @@
 #endregion
 #region Using
 using System;
-using System.CodeDom;
 using System.Diagnostics;
 using System.IO;
-using System.Xml.Linq;
 using OpenJpeg.Internal;
-using static System.Net.Mime.MediaTypeNames;
-using static System.Net.WebRequestMethods;
+
 using OPJ_UINT32 = System.UInt32;
 #endregion
 

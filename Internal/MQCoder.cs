@@ -32,7 +32,6 @@
 #endregion
 using System;
 using System.Diagnostics;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace OpenJpeg.Internal
 {

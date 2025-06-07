@@ -15,7 +15,7 @@ namespace OpenJpeg.Internal
     /// </summary>
     /// <remarks>
     /// Based on PdfLib.BitStream, but this is not a plain
-    /// bit reader as some bits are automatially skipped
+    /// bit reader as some bits are automatically skipped
     /// </remarks>
     internal class BIO
     {
@@ -35,7 +35,7 @@ namespace OpenJpeg.Internal
         /// A buffer containing up to 8 bits
         /// </summary>
         /// <remarks>
-        /// Biggest read is 7 bits, with one potental exception 
+        /// Biggest read is 7 bits, with one potential exception 
         /// that may exceed the 24-bit limit of the org impl.
         /// anyway.
         /// </remarks>
@@ -247,10 +247,10 @@ namespace OpenJpeg.Internal
         /// <summary>
         /// Aligns the stream to the next byte.
         /// </summary>
-        /// <returns>True if a End of Stream</returns>
+        /// <returns>True if an End of Stream</returns>
         /// <remarks>
         /// Don't read into the buffer as there's code 
-        /// reading the position afterwards
+        /// reading the position afterward
         /// </remarks>
         internal bool ByteAlign()
         {

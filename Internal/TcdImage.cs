@@ -31,7 +31,6 @@
  */
 #endregion
 using System;
-using System.Diagnostics;
 
 namespace OpenJpeg.Internal
 {
