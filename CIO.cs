@@ -1,7 +1,6 @@
 ﻿//#define DEBUG_STREAM
 using System;
 using System.IO;
-using System.Xml.Schema;
 
 namespace OpenJpeg
 {

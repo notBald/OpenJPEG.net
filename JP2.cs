@@ -34,8 +34,6 @@
 using System.IO;
 using System.Diagnostics;
 using OpenJpeg.Internal;
-using System.Configuration;
-using System.Runtime.InteropServices;
 
 namespace OpenJpeg
 {

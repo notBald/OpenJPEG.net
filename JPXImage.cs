@@ -36,9 +36,6 @@ using System.Diagnostics;
 using System.Text;
 using OpenJpeg.Internal;
 using System.IO;
-using static System.Net.Mime.MediaTypeNames;
-using System.Security.Cryptography;
-using System.Xml;
 
 namespace OpenJpeg
 {
