@@ -5,6 +5,8 @@
 		<LangVersion>12</LangVersion>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
+		<SignAssembly>True</SignAssembly>
+		<AssemblyOriginatorKeyFile>OpenJpeg.net.snk</AssemblyOriginatorKeyFile>
 	</PropertyGroup>
 
 </Project>
