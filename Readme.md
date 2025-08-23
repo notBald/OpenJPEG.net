@@ -115,4 +115,4 @@ if (!cinfo.StartCompress(cio) || !cinfo.Encode() || !cinfo.EndCompress())
 
 ## About the port
 
-There is no usage of unsafe code.
+There is no usage of unsafe code nor use of vector math. This makes this libary about 4-5 times slower than the native OpenJpeg.
